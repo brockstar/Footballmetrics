@@ -151,85 +151,10 @@ class Sagarin:
             self.rating[i] -= sum
 
 
+
 # Pythagorean expectation in football 
 # -----------------------------------
 
-class oldPythagenport:
-    def __init__(self):
-        self.teams = []
-        self.points_allowed = []
-        self.points_for = []
-        self.win_loss_per = []
-        self.power = []
-        self.prediction = []
-        
-    
-    def loadData(self, d):
-        self.teams = d['teams']
-        self.points_allowed = np.double(d['points_allowed'])
-        self.points_for = np.double(d['points_for'])
-        self.win_loss_per = np.double(d['wlp'])
-        self.games = np.int(d['n_games'])
-
-    
-    def optimizeParams(self, vec):
-        ssq = 0. 
-        for i in range(len(self.teams)):
-            x = vec[0] * np.log10((self.points_for[i]+self.points_allowed[i])*vec[1]/self.games)
-            f = lambda pf, pa: pf**x/(pf**x + pa**x)
-            calc = f(self.points_for[i], self.points_allowed[i])
-            ssq += (self.win_loss_per[i] - calc)**2
-        return ssq
-        
-        
-    def calcPyth(self):
-        guess = [1.5, 1.]
-        self.xopt = fmin(self.optimizeParams, guess)
-        for i in range(len(self.teams)):
-            x = self.xopt[0] * np.log10((self.points_for[i]+self.points_allowed[i])*self.xopt[1]/self.games)
-            f = lambda pf, pa: pf**x/(pf**x + pa**x)
-            self.prediction.append(f(self.points_for[i], self.points_allowed[i]))
-            self.power.append(x)
-            
-
-class oldPythagenpat:
-    def __init__(self):
-        self.teams = []
-        self.points_allowed = []
-        self.points_for = []
-        self.win_loss_per = []
-        self.power = []
-        self.prediction = []
-        
-    
-    def loadData(self, d):
-        self.teams = d['teams']
-        self.points_allowed = np.double(d['points_allowed'])
-        self.points_for = np.double(d['points_for'])
-        self.win_loss_per = np.double(d['wlp'])
-        self.games = np.int(d['n_games'])
-
-    
-    def optimizeParams(self, val):
-        ssq = 0. 
-        for i in range(len(self.teams)):
-            x = ((self.points_for[i]+self.points_allowed[i])/self.games)**val
-            f = lambda pf, pa: pf**x/(pf**x + pa**x)
-            calc = f(self.points_for[i], self.points_allowed[i])
-            ssq += (self.win_loss_per[i] - calc)**2
-        return ssq
-        
-        
-    def calcPyth(self):
-        guess = 0.287
-        self.xopt = fmin(self.optimizeParams, guess)[0]
-        for i in range(len(self.teams)):
-            x = ((self.points_for[i]+self.points_allowed[i])/self.games)**self.xopt
-            f = lambda pf, pa: pf**x/(pf**x + pa**x)
-            self.prediction.append(f(self.points_for[i], self.points_allowed[i]))
-            self.power.append(x)
-            
-            
 class Pythagorean(object):
     def __init__(self, dataDict):
         self.prediction = []
@@ -271,3 +196,11 @@ class Pythagenport(Pythagorean):
         self.f = lambda pf, pa, x: pf**(x[0]*np.log10((pf+pa)/self.ngames+x[1])) \
             / (pf**(x[0]*np.log10((pf+pa)/self.ngames+x[1])) + pa**(x[0]*np.log10((pf+pa)/self.ngames+x[1])))
         self.guessedExp = [1.5, 0.45]
+        
+        
+class Pythagenpat(Pythagorean):
+    def __init__(self, dataDict):
+        super(Pythagenpat, self).__init__(dataDict)
+        self.f = lambda pf, pa, x: pf**(((pf+pa)/self.ngames)**x) \
+            / (pf**(((pf+pa)/self.ngames)**x) + pa**(((pf+pa)/self.ngames)**x))
+        self.guessedExp = 0.287
