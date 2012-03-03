@@ -9,7 +9,7 @@ setup(
     url='http://www.footballissexbaby.de',
     license='GPL',
     description='A package for statistical analysis of football data.',
-    long_description=open('README.txt').read(),
+    long_description=open('README').read(),
     install_requires=[
         "numpy >= 1.6.0",
         "scipy >= 0.10.0",
