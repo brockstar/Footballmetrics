@@ -4,6 +4,10 @@ from scipy.optimize import fmin
 
 
 class Pythagorean(object):
+    '''
+    This is a super class for the different types of the Pythagorean expectation.
+    It is called with a dictionary containing the teams, scores and number of played games (i.e. given week).
+    '''
     def __init__(self, dataDict):
         self.prediction = []
         self.power = []
@@ -20,6 +24,9 @@ class Pythagorean(object):
 	
     
     def minimizeParameters(self, val):
+        '''
+        Helper function to minimize the parameters in self.f.
+        '''
         ssq = 0.
         for i in np.arange(0, len(self.teams)):
             x = self.exp(self.points_for[i], self.points_against[i], val)
@@ -29,6 +36,10 @@ class Pythagorean(object):
     
        
     def calculatePythagorean(self):
+        '''
+        The main routine that calculates the predictions and the power of the Pythagorean expectation.
+        Uses the scipy.optimize.fmin method to minimize the helper function given in minimizeParameters()
+        '''
         self.xopt = fmin(self.minimizeParameters, self.guessedExp)  #best fit parameters
         for i in range(len(self.teams)):
             x = self.exp(self.points_for[i], self.points_against[i], self.xopt) #adjusted parameter per team
@@ -37,6 +48,9 @@ class Pythagorean(object):
             
 
 class PythagoreanExpectation(Pythagorean):
+    '''
+    Implementation of the "classical" Pythagorean expectation.
+    '''
     def __init__(self, dataDict):
         super(PythagoreanExpectation, self).__init__(dataDict)
         self.exp = lambda pf, pa, x: x[0]
