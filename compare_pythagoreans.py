@@ -1,4 +1,4 @@
-import football_science
+import footballmetrics.Pythagoreans as football_science
 import sqlite3
 import numpy as np
 from scipy.stats import pearsonr
@@ -43,17 +43,15 @@ for year in years:
         wlp.append(x)
         wins.append(row[4])
     
-    d = {'teams':teams, 'points_allowed':pa, 'points_for':pf, 'wlp':wlp, 'n_games':w}
+    d = {'teams':teams, 'points_against':pa, 'points_for':pf, 'wlp':wlp, 'ngames':w}
 
-    pythagorean = football_science.PythagoreanExpectation()
-    pythagorean.loadData(d)
-    pythagorean.calc_pyth()
-    pythagenport = football_science.Pythagenport()
-    pythagenport.loadData(d)
-    pythagenport.calcPyth()    
-    pythagenpat = football_science.Pythagenpat()
-    pythagenpat.loadData(d)
-    pythagenpat.calcPyth()
+    pythagorean = football_science.PythagoreanExpectation(d)
+    pythagorean.calculatePythagorean()
+    pythagenport = football_science.Pythagenport(d)
+    pythagenport.calculatePythagorean()    
+    pythagenpat = football_science.Pythagenpat(d)
+    pythagenpat.calculatePythagorean()
+    
     
     pred_pythagorean.append(dict(zip(teams,pythagorean.prediction)))
     pred_pythagenport.append(dict(zip(teams,pythagenport.prediction)))
@@ -64,14 +62,14 @@ for year in years:
     corr_pythagenport.append(pearsonr(pythagenport.prediction, wlp))
     corr_pythagenpat.append(pearsonr(pythagenpat.prediction, wlp))
     
-    xopt_pythagorean.append(pythagorean.power)
+    xopt_pythagorean.append(pythagorean.xopt)
     xopt_pythagenport.append(pythagenport.xopt)
     xopt_pythagenpat.append(pythagenpat.xopt)
 
 
 for index, item in enumerate(years):    
     print '\nStatistics for %d season' % item
-    print 'Pythagorean: p=%3.5f\txopt=%3.5f' % (corr_pythagorean[index][0], xopt_pythagorean[index])
+    print 'Pythagorean: p=%3.5f\txopt=%3.5f' % (corr_pythagorean[index][0], xopt_pythagorean[index][0])
     print 'Pythagenport: p=%3.5f\txopt=%3.5f %3.5f' % \
         (corr_pythagenport[index][0], xopt_pythagenport[index][0], xopt_pythagenport[index][1])
     print 'Pythagenpat: p=%3.5f\txopt=%3.5f' % (corr_pythagenpat[index][0], xopt_pythagenpat[index])
