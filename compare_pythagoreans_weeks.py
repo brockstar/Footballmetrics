@@ -1,4 +1,4 @@
-import football_science
+import footballmetrics.Pythagoreans as football_science
 import sqlite3
 import numpy as np
 from scipy.stats import pearsonr
@@ -35,18 +35,15 @@ for year in years:
             wlp.append(x)
             wins.append(row[4])
         
-        d = {'teams':teams, 'points_allowed':pa, 'points_for':pf, 'wlp':wlp, 'n_games':w}
+        d = {'teams':teams, 'points_against':pa, 'points_for':pf, 'wlp':wlp, 'ngames':w}
     
-        pythagorean = football_science.PythagoreanExpectation()
-        pythagorean.loadData(d)
-        pythagorean.calc_pyth()
-        pythagenport = football_science.Pythagenport()
-        pythagenport.loadData(d)
-        pythagenport.calcPyth()    
-        pythagenpat = football_science.Pythagenpat()
-        pythagenpat.loadData(d)
-        pythagenpat.calcPyth()
+        pythagorean = football_science.PythagoreanExpectation(d)
+        pythagorean.calculatePythagorean()
+        pythagenport = football_science.Pythagenport(d)
+        pythagenport.calculatePythagorean()    
+        pythagenpat = football_science.Pythagenpat(d)
+        pythagenpat.calculatePythagorean()
         
-        exp_pythagorean.append(pythagorean.power)
+        exp_pythagorean.append(pythagorean.power[0])
         exp_pythagenport.append(pythagenport.power)
         exp_pythagenpat.append(pythagenpat.power)
