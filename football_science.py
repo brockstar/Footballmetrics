@@ -188,47 +188,6 @@ class PythagoreanExpectation:
             self.prediction.append(f(self.power, self.points_for[i], self.points_allowed[i]))
             
             
-class PythagoreanExpectationTest:
-    def __init__(self):
-        self.teams = []
-        self.points_allowed = []
-        self.points_for = []
-        self.win_loss_per = []
-        self.power = 0.
-        self.prediction = []
-        
-    
-    def loadData(self, d):
-        self.teams = d['teams']
-        self.points_allowed = np.double(d['points_allowed'])
-        self.points_for = np.double(d['points_for'])
-        self.win_loss_per = np.double(d['wlp'])
-
-
-    def setCoefficients(self, old_x, new_x):
-        self.old_x = np.double(old_x)
-        self.new_x = np.double(new_x)
-
-
-    def helper(self, x):
-        ssq = 0.
-        f = lambda x, pf_, pa_: x[0]*(pf_**self.old_x / (pf_**self.old_x + pa_**self.old_x)) + x[1]*(pf_**self.new_x / (pf_**self.new_x + pa_**self.new_x))
-        for i in np.arange(0, len(self.teams)):
-            calc = f(x, self.points_for[i], self.points_allowed[i])
-            ssq += (self.win_loss_per[i] - calc)**2
-        
-        return ssq
-
-
-    def calc_pyth(self):    
-        x0 = 2
-        self.xopt = fmin(self.helper, x0)
-        f = lambda x, pf, pa: pf**x / (pf**x + pa**x)
-        for i in np.arange(0, len(self.teams)):
-            self.prediction.append(f(self.xopt, self.points_for[i], self.points_allowed[i]))
-           
-
-
 class Pythagenport:
     def __init__(self):
         self.teams = []
@@ -306,21 +265,19 @@ class Pythagenpat:
             
             
 class Pythagorean(object):
-    def __init__(self):
+    def __init__(self, dataDict):
         self.prediction = []
         self.power = []
         
         self.f = lambda pf, pa, x: pf**x / (pf**x + pa**x)
         self.guessedExp = 2.
-        
-    def loadData(self, data_dict):
-        self.teams = data_dict['teams']
-        self.points_for = np.double(data_dict['points_for'])
-        self.points_against = np.double(data_dict['points_against'])
-        self.wlp = np.double(data_dict['wlp'])
-        self.ngames = np.int(data_dict['ngames'])
-        self.prediction = []
-        self.power = []
+	
+	self.teams = dataDict['teams']
+        self.points_for = np.double(dataDict['points_for'])
+        self.points_against = np.double(dataDict['points_against'])
+        self.wlp = np.double(dataDict['wlp'])
+        self.ngames = np.int(dataDict['ngames'])
+	
     
     def minimizeParameters(self, val):
         pass
@@ -334,13 +291,12 @@ class Pythagorean(object):
             
 
 class PythExp(Pythagorean):
-    def __init__(self):
-        super(PythExp, self).__init__()
+    def __init__(self, dataDict):
+        super(PythExp, self).__init__(dataDict)
 
     def minimizeParameters(self, val):
         ssq = 0.
         for i in np.arange(0, len(self.teams)):
             calc = self.f(self.points_for[i], self.points_against[i], val)
             ssq += (self.wlp[i] - calc)**2
-        
         return ssq
