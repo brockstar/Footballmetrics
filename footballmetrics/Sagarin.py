@@ -21,9 +21,9 @@ class Sagarin:
         
         for i in np.arange(np.shape(a)[0]):
             if str(a[i][0]) not in temp_team:
-            temp_team.append(str(a[i][0]))
+                temp_team.append(str(a[i][0]))
             if str(a[i][2]) not in temp_team:
-            temp_team.append(str(a[i][2]))
+                temp_team.append(str(a[i][2]))
         
         temp_team.sort()
         for i in np.arange(0, len(temp_team)):
