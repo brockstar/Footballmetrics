@@ -153,42 +153,8 @@ class Sagarin:
 
 # Pythagorean expectation in football 
 # -----------------------------------
-class PythagoreanExpectation:
-    def __init__(self):
-        self.teams = []
-        self.points_allowed = []
-        self.points_for = []
-        self.win_loss_per = []
-        self.power = 0.
-        self.prediction = []
-        
-    
-    def loadData(self, d):
-        self.teams = d['teams']
-        self.points_allowed = np.double(d['points_allowed'])
-        self.points_for = np.double(d['points_for'])
-        self.win_loss_per = np.double(d['wlp'])
 
-    
-    def helper(self, x):
-        ssq = 0.
-        f = lambda x_,pf_,pa_: pf_**x_ / (pf_**x_ + pa_**x_)
-        for i in np.arange(0, len(self.teams)):
-            calc = f(x, self.points_for[i], self.points_allowed[i])
-            ssq += (self.win_loss_per[i] - calc)**2
-        
-        return ssq
-        
-        
-    def calc_pyth(self):
-        xa, xb, xc, fa, fb, fc, calls = bracket(self.helper)
-        self.power = brent(self.helper, brack=(xa,xb,xc))
-        f = lambda x,pf,pa: pf**x / (pf**x + pa**x)
-        for i in np.arange(0, len(self.teams)):
-            self.prediction.append(f(self.power, self.points_for[i], self.points_allowed[i]))
-            
-            
-class Pythagenport:
+class oldPythagenport:
     def __init__(self):
         self.teams = []
         self.points_allowed = []
@@ -226,7 +192,7 @@ class Pythagenport:
             self.power.append(x)
             
 
-class Pythagenpat:
+class oldPythagenpat:
     def __init__(self):
         self.teams = []
         self.points_allowed = []
@@ -280,7 +246,11 @@ class Pythagorean(object):
 	
     
     def minimizeParameters(self, val):
-        pass
+        ssq = 0.
+        for i in np.arange(0, len(self.teams)):
+            calc = self.f(self.points_for[i], self.points_against[i], val)
+            ssq += (self.wlp[i] - calc)**2
+        return ssq
     
        
     def calculatePythagorean(self):
@@ -290,13 +260,14 @@ class Pythagorean(object):
             self.power.append(self.xopt)
             
 
-class PythExp(Pythagorean):
+class PythagoreanExpectation(Pythagorean):
     def __init__(self, dataDict):
-        super(PythExp, self).__init__(dataDict)
-
-    def minimizeParameters(self, val):
-        ssq = 0.
-        for i in np.arange(0, len(self.teams)):
-            calc = self.f(self.points_for[i], self.points_against[i], val)
-            ssq += (self.wlp[i] - calc)**2
-        return ssq
+        super(PythagoreanExpectation, self).__init__(dataDict)
+        
+    
+class Pythagenport(Pythagorean):
+    def __init__(self, dataDict):
+        super(Pythagenport, self).__init__(dataDict)
+        self.f = lambda pf, pa, x: pf**(x[0]*np.log10((pf+pa)/self.ngames+x[1])) \
+            / (pf**(x[0]*np.log10((pf+pa)/self.ngames+x[1])) + pa**(x[0]*np.log10((pf+pa)/self.ngames+x[1])))
+        self.guessedExp = [1.5, 0.45]
