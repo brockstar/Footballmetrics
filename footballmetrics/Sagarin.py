@@ -2,16 +2,9 @@ from __future__ import division
 
 import numpy as np
 from scipy.linalg import svd, diagsvd
-from scipy.optimize import brent, bracket, fmin
 import random
-from IPython import embed
-    
-# ranking systems
-# ===============
 
 
-# Sagarin rankings
-# ----------------
 class Sagarin:
     def __init__(self):
         self.teams = {}
@@ -24,23 +17,23 @@ class Sagarin:
               
                 
     def loadData(self, a):
-    	temp_team = []
+        temp_team = []
         
-    	for i in np.arange(np.shape(a)[0]):
-    	    if str(a[i][0]) not in temp_team:
-    		temp_team.append(str(a[i][0]))
-    	    if str(a[i][2]) not in temp_team:
-    		temp_team.append(str(a[i][2]))
-    	
-    	temp_team.sort()
-    	for i in np.arange(0, len(temp_team)):
+        for i in np.arange(np.shape(a)[0]):
+            if str(a[i][0]) not in temp_team:
+            temp_team.append(str(a[i][0]))
+            if str(a[i][2]) not in temp_team:
+            temp_team.append(str(a[i][2]))
+        
+        temp_team.sort()
+        for i in np.arange(0, len(temp_team)):
             self.teams[temp_team[i]] = i
 
         for i in np.arange(0, np.shape(a)[0]):
             self.home_team.append(self.teams[a[i][0]])
-    	    self.away_team.append(self.teams[a[i][2]])
-    	    self.home_score.append(np.double(a[i][1]))
-    	    self.away_score.append(np.double(a[i][3]))
+            self.away_team.append(self.teams[a[i][2]])
+            self.home_score.append(np.double(a[i][1]))
+            self.away_score.append(np.double(a[i][3]))
 
             
     def calc_sagarin(self):
@@ -103,13 +96,13 @@ class Sagarin:
         for i in np.arange(0, max_iter):
             rnd = np.empty((len(self.home_team),))
             for j in np.arange (0,len(rnd)):
-        	rnd[j] = random.randint(0, len(rnd)-1)
+            rnd[j] = random.randint(0, len(rnd)-1)
         
             matrix_var = np.zeros(np.shape(matrix))
             margins_var = np.zeros(np.shape(home_margins))
             for j in np.arange(0, len(rnd)):
-        	matrix_var[j,:] = matrix[rnd[j],:]
-        	margins_var[j] = home_margins[rnd[j]]
+            matrix_var[j,:] = matrix[rnd[j],:]
+            margins_var[j] = home_margins[rnd[j]]
         
             U, s, Vh = svd(matrix_var)
         
@@ -149,58 +142,3 @@ class Sagarin:
         sum /= len(self.teams)
         for i in self.teams:
             self.rating[i] -= sum
-
-
-
-# Pythagorean expectation in football 
-# -----------------------------------
-
-class Pythagorean(object):
-    def __init__(self, dataDict):
-        self.prediction = []
-        self.power = []
-        
-        self.f = lambda pf, pa, x: pf**x / (pf**x + pa**x)
-        self.guessedExp = 2.
-	
-	self.teams = dataDict['teams']
-        self.points_for = np.double(dataDict['points_for'])
-        self.points_against = np.double(dataDict['points_against'])
-        self.wlp = np.double(dataDict['wlp'])
-        self.ngames = np.int(dataDict['ngames'])
-	
-    
-    def minimizeParameters(self, val):
-        ssq = 0.
-        for i in np.arange(0, len(self.teams)):
-            calc = self.f(self.points_for[i], self.points_against[i], val)
-            ssq += (self.wlp[i] - calc)**2
-        return ssq
-    
-       
-    def calculatePythagorean(self):
-        self.xopt = fmin(self.minimizeParameters, self.guessedExp)
-        for i in range(len(self.teams)):
-            self.prediction.append(self.f(self.points_for[i], self.points_against[i], self.xopt))
-            self.power.append(self.xopt)
-            
-
-class PythagoreanExpectation(Pythagorean):
-    def __init__(self, dataDict):
-        super(PythagoreanExpectation, self).__init__(dataDict)
-        
-    
-class Pythagenport(Pythagorean):
-    def __init__(self, dataDict):
-        super(Pythagenport, self).__init__(dataDict)
-        self.f = lambda pf, pa, x: pf**(x[0]*np.log10((pf+pa)/self.ngames+x[1])) \
-            / (pf**(x[0]*np.log10((pf+pa)/self.ngames+x[1])) + pa**(x[0]*np.log10((pf+pa)/self.ngames+x[1])))
-        self.guessedExp = [1.5, 0.45]
-        
-        
-class Pythagenpat(Pythagorean):
-    def __init__(self, dataDict):
-        super(Pythagenpat, self).__init__(dataDict)
-        self.f = lambda pf, pa, x: pf**(((pf+pa)/self.ngames)**x) \
-            / (pf**(((pf+pa)/self.ngames)**x) + pa**(((pf+pa)/self.ngames)**x))
-        self.guessedExp = 0.287

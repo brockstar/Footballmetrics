@@ -1,0 +1,8 @@
+===============
+Footballmetrics
+===============
+
+Introduction
+------------
+This package provides methods to evaluate football data.
+There is a module to create Sagarin rankings and another one to calculate different types of Pythagorean expectations.
