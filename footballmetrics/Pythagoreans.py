@@ -7,6 +7,10 @@ class Pythagorean(object):
     '''
     This is a super class for the different types of the Pythagorean expectation.
     It is called with a dictionary containing the teams, scores and number of played games (i.e. given week).
+
+    * self.f - The general formula for each Pythagorean Expectation.
+    * self.exp - The formula for the exponent.
+    * self.guessedExp - Initial guess for the optimization
     '''
     def __init__(self, dataDict):
         self.prediction = []
@@ -25,7 +29,7 @@ class Pythagorean(object):
     
     def minimizeParameters(self, val):
         '''
-        Helper function to minimize the parameters in self.f.
+        Helper function to minimize the function self.f with the given parameters.
         '''
         ssq = 0.
         for i in np.arange(0, len(self.teams)):
@@ -57,6 +61,10 @@ class PythagoreanExpectation(Pythagorean):
         
     
 class Pythagenport(Pythagorean):
+    '''
+    Implementation of the Pythagenport formula.
+    The exponent is calculated as (x0 * log10((pf+pa)/ngames) + x1). Traditionally, x0 = 1.5 and x1 = 0.45.
+    '''
     def __init__(self, dataDict):
         super(Pythagenport, self).__init__(dataDict)
         self.exp = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.ngames+x[1])
@@ -64,6 +72,10 @@ class Pythagenport(Pythagorean):
         
         
 class Pythagenpat(Pythagorean):
+    '''
+    Implementation of the Pythagenpat formula.
+    The exponent is calculated as ((pf+pa)/ngames)**x. Traditionally, x = 0.287.
+    '''
     def __init__(self, dataDict):
         super(Pythagenpat, self).__init__(dataDict)
         self.exp = lambda pf, pa, x: ((pf+pa)/self.ngames)**x[0]
