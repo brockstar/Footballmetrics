@@ -45,11 +45,14 @@ for year in years:
     
     d = {'teams':teams, 'points_against':pa, 'points_for':pf, 'wlp':wlp, 'ngames':w}
 
-    pythagorean = football_science.PythagoreanExpectation(d)
+    pythagorean = football_science.PythagoreanExpectation(d, optimize=False)
+    pythagorean.setStaticExp([2.37])
     pythagorean.calculatePythagorean()
-    pythagenport = football_science.Pythagenport(d)
+    pythagenport = football_science.Pythagenport(d, optimize=False)
+    pythagenport.setStaticExp([1.5, 0.45])
     pythagenport.calculatePythagorean()    
-    pythagenpat = football_science.Pythagenpat(d)
+    pythagenpat = football_science.Pythagenpat(d, optimize=False)
+    pythagenpat.setStaticExp([0.287])
     pythagenpat.calculatePythagorean()
     
     
