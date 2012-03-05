@@ -1,0 +1,2 @@
+Pythagenpat class
+==================

@@ -1,0 +1,2 @@
+Pythagorean class
+=================
