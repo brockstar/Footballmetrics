@@ -44,52 +44,59 @@ class PythagoreansTest(unittest.TestCase):
         
     
     def testPythagoreanNoOptPrediction(self):
+        '''Testing PythagoreanExpectation with known predictions...'''
         pyth = Pythagoreans.PythagoreanExpectation(self.testdict)
         pyth.calculatePythagorean(optimize=False, staticParams=[2.63])
         self.assertEqual(pyth.prediction, self.knownPredictions['Pythagorean'])
         
     def testPythagenportNoOptPrediction(self):
+        '''Testing Pythagenport with known predictions...'''
         pyth = Pythagoreans.Pythagenport(self.testdict)
         pyth.calculatePythagorean(optimize=False, staticParams=[1.5, 0.45])
         self.assertEqual(pyth.prediction, self.knownPredictions['Pythagenport'])
         
     def testPythagenportFONoOptPrediction(self):
+        '''Testing PythagenportFO with known predictions...'''
         pyth = Pythagoreans.PythagenportFO(self.testdict)
         pyth.calculatePythagorean(optimize=False, staticParams=[1.5])
         self.assertEqual(pyth.prediction, self.knownPredictions['PythagenportFO'])
         
     def testPythagenpatNoOptPrediction(self):
+        '''Testing Pythagenpat with known predictions...'''
         pyth = Pythagoreans.Pythagenpat(self.testdict)
         pyth.calculatePythagorean(optimize=False, staticParams=[0.287])
         self.assertEqual(pyth.prediction, self.knownPredictions['Pythagenpat'])
         
     def testPythagenportNoOptPower(self):
+        '''Testing Pythagenport with known powers...'''
         pyth = Pythagoreans.Pythagenport(self.testdict)
         pyth.calculatePythagorean(optimize=False, staticParams=[1.5, 0.45])
         self.assertEqual(pyth.power, self.knownPowers['Pythagenport'])
         
     def testPythagenportFONoOptPower(self):
+        '''Testing PythagenportFO with known powers...'''
         pyth = Pythagoreans.PythagenportFO(self.testdict)
         pyth.calculatePythagorean(optimize=False, staticParams=[1.5])
         self.assertEqual(pyth.power, self.knownPowers['PythagenportFO'])
         
     def testPythagenpatNoOptPower(self):
+        '''Testing Pythagenpat with known powers...'''
         pyth = Pythagoreans.Pythagenpat(self.testdict)
         pyth.calculatePythagorean(optimize=False, staticParams=[0.287])
         self.assertEqual(pyth.power, self.knownPowers['Pythagenpat'])
         
     
     def testPythagoreanOptNoParams(self):
-        # called without optimization, but no static parameters given 
+        '''Testing Pythagorean without optimization and missing parameters...'''
         pyth = Pythagoreans.Pythagorean(self.testdict)
         self.assertRaises(TypeError, pyth.calculatePythagorean, optimize=False)
         
     def testPythagoreanBadInput(self):
-        # one value is a string and not a float
+        '''Testing Pythagorean with bad input...'''
         self.assertRaises(ValueError, Pythagoreans.Pythagorean, dataDict=self.testStringDict)
         
     def testPythagoreanIncompleteDict(self):
-        # there are missing keys in the dictionary
+        '''Testing Pythagorean with incomplete dictionary...'''
         self.assertRaises(KeyError, Pythagoreans.Pythagorean, dataDict=self.testIncompleteDict)
         
     
