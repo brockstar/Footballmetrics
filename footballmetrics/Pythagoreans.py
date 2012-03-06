@@ -62,8 +62,7 @@ class Pythagorean(object):
                 elif not optimize and staticParams != None:
                     x = self.calculateExponent(self.pointsFor[i], self.pointsAgainst[i], staticParams)
                 else:
-                    print 'ERROR. There were no static parameters given, ',
-                    print 'albeit method was called without optimization.'
+                    x = None
                 
                 self.prediction.append(self.f(self.pointsFor[i], self.pointsAgainst[i], x))
                 self.power.append(x)

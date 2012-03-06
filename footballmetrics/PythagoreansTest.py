@@ -1,11 +1,17 @@
 import Pythagoreans
 import unittest
 
-class KnownValues(unittest.TestCase):
+class PythagoreansTest(unittest.TestCase):
     testdict={'teams':['A','B','C', 'D'], 'pointsFor':[32, 65, 40, 0], 'pointsAgainst':[56,27,40, 79], \
               'wlp':[2/3., 1.0, 1/3., 0.0], 'nGames':3}
     
+    testStringDict = {'teams':['A','B','C', 'D'], 'pointsFor':['bla', 65, 40, 0], 'pointsAgainst':[56,27,40, 79], \
+              'wlp':[2/3., 1.0, 1/3., 0.0], 'nGames':3}
+    
+    testIncompleteDict = {'teams':['A','B','C', 'D']}
+    
     # no optimization, used exponent: x = 2.63
+    # calculated predictions and powers using the lambda's in iPython
     knownPredictions = {'Pythagorean':[0.18667076776695243,
                                        0.9097501086210673,
                                        0.5,
@@ -71,3 +77,21 @@ class KnownValues(unittest.TestCase):
         pyth = Pythagoreans.Pythagenpat(self.testdict)
         pyth.calculatePythagorean(optimize=False, staticParams=[0.287])
         self.assertEqual(pyth.power, self.knownPowers['Pythagenpat'])
+        
+    
+    def testPythagoreanOptNoParams(self):
+        # called without optimization, but no static parameters given 
+        pyth = Pythagoreans.Pythagorean(self.testdict)
+        self.assertRaises(TypeError, pyth.calculatePythagorean, optimize=False)
+        
+    def testPythagoreanBadInput(self):
+        # one value is a string and not a float
+        self.assertRaises(ValueError, Pythagoreans.Pythagorean, dataDict=self.testStringDict)
+        
+    def testPythagoreanIncompleteDict(self):
+        # there are missing keys in the dictionary
+        self.assertRaises(KeyError, Pythagoreans.Pythagorean, dataDict=self.testIncompleteDict)
+        
+    
+if __name__ == "__main__":
+    unittest.main()
