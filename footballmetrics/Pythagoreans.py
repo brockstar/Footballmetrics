@@ -21,10 +21,10 @@ class Pythagorean(object):
         self.guess = 2.0
         
         self.teams = dataDict['teams']
-        self.pointsFor = np.double(dataDict['points_for'])
-        self.pointsAgainst = np.double(dataDict['points_against'])
+        self.pointsFor = np.double(dataDict['pointsFor'])
+        self.pointsAgainst = np.double(dataDict['pointsAgainst'])
         self.wlp = np.double(dataDict['wlp'])
-        self.nGames = np.int(dataDict['ngames'])
+        self.nGames = np.int(dataDict['nGames'])
 	
 
     def getOptimalFitParams(self):
@@ -32,6 +32,7 @@ class Pythagorean(object):
             return self.xopt
         except:
             print 'ERROR. There was no optimazation performed.'
+            return [0.,0.]
  
     
     def minimizeParams(self, val):
@@ -91,8 +92,20 @@ class Pythagenport(Pythagorean):
     '''
     def __init__(self, dataDict, optimize=True):
         super(Pythagenport, self).__init__(dataDict)
-        self.calculateExponent = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.nGames+x[1])
+        self.calculateExponent = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.nGames)+x[1]
         self.guess = [1.5, 0.45]
+        
+        
+        
+class PythagenportFO(Pythagorean):
+    '''
+    Football Outsiders implementation of the Pythagenport formula.
+    The exponent is calculated as x * log10((pf+pa)/nGames). In FO's formula x = 1.5.
+    '''
+    def __init__(self, dataDict, optimize=True):
+        super(Pythagenport, self).__init__(dataDict)
+        self.calculateExponent = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.nGames)
+        self.guess = [1.5]
         
         
         

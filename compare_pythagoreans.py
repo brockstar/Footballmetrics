@@ -43,7 +43,7 @@ for year in years:
         wlp.append(x)
         wins.append(row[4])
     
-    d = {'teams':teams, 'points_against':pa, 'points_for':pf, 'wlp':wlp, 'ngames':w}
+    d = {'teams':teams, 'pointsAgainst':pa, 'pointsFor':pf, 'wlp':wlp, 'nGames':w}
 
     pythagorean = football_science.PythagoreanExpectation(d)
     pythagorean.calculatePythagorean(optimize=True)
