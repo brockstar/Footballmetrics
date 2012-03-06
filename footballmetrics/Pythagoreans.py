@@ -32,8 +32,8 @@ class Pythagorean(object):
             return self.xopt
         except:
             print 'ERROR. There was no optimazation performed.'
-            return [0.,0.]
- 
+            raise
+        
     
     def minimizeParams(self, val):
         '''
@@ -103,9 +103,9 @@ class PythagenportFO(Pythagorean):
     The exponent is calculated as x * log10((pf+pa)/nGames). In FO's formula x = 1.5.
     '''
     def __init__(self, dataDict, optimize=True):
-        super(Pythagenport, self).__init__(dataDict)
+        super(PythagenportFO, self).__init__(dataDict)
         self.calculateExponent = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.nGames)
-        self.guess = [1.5]
+        self.guess = 1.5
         
         
         
@@ -116,5 +116,5 @@ class Pythagenpat(Pythagorean):
     '''
     def __init__(self, dataDict, optimize=True):
         super(Pythagenpat, self).__init__(dataDict)
-        self.calculateExponent = lambda pf, pa, x: ((pf+pa)/self.nGames)**x[0]
+        self.calculateExponent = lambda pf, pa, x: ((pf+pa)/float(self.nGames))**x[0]
         self.guess = 0.287

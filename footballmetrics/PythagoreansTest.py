@@ -14,6 +14,10 @@ class KnownValues(unittest.TestCase):
                                         0.91329243205946342,
                                         0.5,
                                         0.0],
+                        'PythagenportFO':[0.22587739319369521,
+                                          0.87644280441932565,
+                                          0.5,
+                                          0.0],
                         'Pythagenpat':[0.18606512374956286,
                                        0.9126639951760125,
                                        0.5,
@@ -23,6 +27,10 @@ class KnownValues(unittest.TestCase):
                                    2.6799998589388392,
                                    2.5889530984084219,
                                    2.5807587548561686],
+                   'PythagenportFO':[2.2010421261457589,
+                                     2.229999858938839,
+                                     2.1389530984084217,
+                                     2.1307587548561684],
                    'Pythagenpat':[2.6371372107309616,
                                   2.670996422565167,
                                   2.5659785768382335,
@@ -39,6 +47,11 @@ class KnownValues(unittest.TestCase):
         pyth.calculatePythagorean(optimize=False, staticParams=[1.5, 0.45])
         self.assertEqual(pyth.prediction, self.knownPredictions['Pythagenport'])
         
+    def testPythagenportFONoOptPrediction(self):
+        pyth = Pythagoreans.PythagenportFO(self.testdict)
+        pyth.calculatePythagorean(optimize=False, staticParams=[1.5])
+        self.assertEqual(pyth.prediction, self.knownPredictions['PythagenportFO'])
+        
     def testPythagenpatNoOptPrediction(self):
         pyth = Pythagoreans.Pythagenpat(self.testdict)
         pyth.calculatePythagorean(optimize=False, staticParams=[0.287])
@@ -48,6 +61,11 @@ class KnownValues(unittest.TestCase):
         pyth = Pythagoreans.Pythagenport(self.testdict)
         pyth.calculatePythagorean(optimize=False, staticParams=[1.5, 0.45])
         self.assertEqual(pyth.power, self.knownPowers['Pythagenport'])
+        
+    def testPythagenportFONoOptPower(self):
+        pyth = Pythagoreans.PythagenportFO(self.testdict)
+        pyth.calculatePythagorean(optimize=False, staticParams=[1.5])
+        self.assertEqual(pyth.power, self.knownPowers['PythagenportFO'])
         
     def testPythagenpatNoOptPower(self):
         pyth = Pythagoreans.Pythagenpat(self.testdict)
