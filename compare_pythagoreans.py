@@ -45,15 +45,14 @@ for year in years:
     
     d = {'teams':teams, 'points_against':pa, 'points_for':pf, 'wlp':wlp, 'ngames':w}
 
-    pythagorean = football_science.PythagoreanExpectation(d, optimize=False)
-    pythagorean.setStaticExp([2.37])
-    pythagorean.calculatePythagorean()
-    pythagenport = football_science.Pythagenport(d, optimize=False)
-    pythagenport.setStaticExp([1.5, 0.45])
-    pythagenport.calculatePythagorean()    
-    pythagenpat = football_science.Pythagenpat(d, optimize=False)
-    pythagenpat.setStaticExp([0.287])
-    pythagenpat.calculatePythagorean()
+    pythagorean = football_science.PythagoreanExpectation(d)
+    pythagorean.calculatePythagorean(optimize=True)
+
+    pythagenport = football_science.Pythagenport(d)
+    pythagenport.calculatePythagorean(optimize=True)    
+    
+    pythagenpat = football_science.Pythagenpat(d)
+    pythagenpat.calculatePythagorean(optimize=True)
     
     
     pred_pythagorean.append(dict(zip(teams,pythagorean.prediction)))
@@ -65,9 +64,9 @@ for year in years:
     corr_pythagenport.append(pearsonr(pythagenport.prediction, wlp))
     corr_pythagenpat.append(pearsonr(pythagenpat.prediction, wlp))
     
-    xopt_pythagorean.append(pythagorean.xopt)
-    xopt_pythagenport.append(pythagenport.xopt)
-    xopt_pythagenpat.append(pythagenpat.xopt)
+    xopt_pythagorean.append(pythagorean.getOptimalFitParams())
+    xopt_pythagenport.append(pythagenport.getOptimalFitParams())
+    xopt_pythagenpat.append(pythagenpat.getOptimalFitParams())
 
 
 for index, item in enumerate(years):    
