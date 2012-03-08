@@ -5,11 +5,11 @@ import scipy.optimize
 
 class Pythagorean(object):
     '''
-    This is a super class for the different types of the Pythagorean expectation.
-    It is called with a dictionary containing the teams, scores and number of played games (i.e. given week).
+    This is a super class for the different types of the 
+    Pythagorean expectation. It is called with a dictionary containing 
+    the teams, scores and number of played games (i.e. given week).
 
-    * self.f - The general formula for each Pythagorean Expectation.
-    * self.exp - The formula for the exponent.
+    * self.calculateExponent - Formula for the exponent x.
     * self.guess - Initial guess for the optimization
     '''
     def __init__(self, dataDict):
@@ -26,94 +26,88 @@ class Pythagorean(object):
         self.wlp = np.double(dataDict['wlp'])
         self.nGames = np.int(dataDict['nGames'])
 	
-
     def getOptimalFitParams(self):
+        '''
+        Returns the optimal fit parameters retrieved from scipy.optimize.fmin 
+        in calculatePythagorean().
+        '''
         try:
             return self.xopt
         except:
-            print 'ERROR. There was no optimazation performed.'
             raise
         
-    
-    def minimizeParams(self, val):
-        '''
-        Helper function to minimize the function self.f with the given parameters.
-        '''
+    def __minimizeParams(self, val):
         ssq = 0.
         for i in np.arange(0, len(self.teams)):
-            x = self.calculateExponent(self.pointsFor[i], self.pointsAgainst[i], val)
+            x = self.calculateExponent(self.pointsFor[i], 
+                                       self.pointsAgainst[i], val)
             calc = self.f(self.pointsFor[i], self.pointsAgainst[i], x)
             ssq += (self.wlp[i] - calc)**2
         return ssq
     
-       
     def calculatePythagorean(self, optimize=True, staticParams=None):
         '''
-        The main routine that calculates the predictions and the power of the Pythagorean expectation.
-        Uses the scipy.optimize.fmin method to minimize the helper function given in minimizeParameters()
+        Returns the predictions and power for all given teams. 
+        An optimatization for the exponent formula is performed, 
+        if optimize is set to True. If set to False the static exponent 
+        parameters need to be given as a list.
         '''
         try:
             if optimize:
-                self.xopt = scipy.optimize.fmin(self.minimizeParams, self.guess)  #best fit parameters
+                self.xopt = scipy.optimize.fmin(self.__minimizeParams, self.guess)  #best fit parameters
 
             for i in range(len(self.teams)):
                 if optimize:
-                    x = self.calculateExponent(self.pointsFor[i], self.pointsAgainst[i], self.xopt) #adjusted parameter per team
+                    x = self.calculateExponent(self.pointsFor[i], 
+                                               self.pointsAgainst[i], self.xopt) #adjusted parameter per team
                 elif not optimize and staticParams != None:
-                    x = self.calculateExponent(self.pointsFor[i], self.pointsAgainst[i], staticParams)
+                    x = self.calculateExponent(self.pointsFor[i], 
+                                               self.pointsAgainst[i], staticParams)
                 else:
                     x = None
                 
-                self.prediction.append(self.f(self.pointsFor[i], self.pointsAgainst[i], x))
+                self.prediction.append(self.f(self.pointsFor[i], 
+                                              self.pointsAgainst[i], x))
                 self.power.append(x)
                 
             return self.prediction, self.power
-        
         except:
             raise
-            
-
+        
 
 class PythagoreanExpectation(Pythagorean):
     '''
-    Implementation of the "classical" Pythagorean expectation.
+    Implementation of the classical Pythagorean expectation.
     '''
-    def __init__(self, dataDict, optimize=True):
+    def __init__(self, dataDict):
         super(PythagoreanExpectation, self).__init__(dataDict)
         self.calculateExponent = lambda pf, pa, x: x[0]
         
-    
-    
 class Pythagenport(Pythagorean):
     '''
-    Implementation of the Pythagenport formula.
-    The exponent is calculated as (x0 * log10((pf+pa)/nGames) + x1). Traditionally, x0 = 1.5 and x1 = 0.45.
+    Implementation of Clay Davenport's Pythagenport formula.
     '''
-    def __init__(self, dataDict, optimize=True):
+    def __init__(self, dataDict):
         super(Pythagenport, self).__init__(dataDict)
         self.calculateExponent = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.nGames)+x[1]
         self.guess = [1.5, 0.45]
         
-        
-        
+
 class PythagenportFO(Pythagorean):
     '''
-    Football Outsiders implementation of the Pythagenport formula.
-    The exponent is calculated as x * log10((pf+pa)/nGames). In FO's formula x = 1.5.
+    Implementation of Football Outsiders' Pythagenport formula.
     '''
-    def __init__(self, dataDict, optimize=True):
+    def __init__(self, dataDict):
         super(PythagenportFO, self).__init__(dataDict)
         self.calculateExponent = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.nGames)
         self.guess = 1.5
         
         
-        
 class Pythagenpat(Pythagorean):
     '''
-    Implementation of the Pythagenpat formula.
-    The exponent is calculated as ((pf+pa)/nGames)**x. Traditionally, x = 0.287.
+    Implementation of David Smyth's Pythagenpat formula.
     '''
-    def __init__(self, dataDict, optimize=True):
+    def __init__(self, dataDict):
         super(Pythagenpat, self).__init__(dataDict)
         self.calculateExponent = lambda pf, pa, x: ((pf+pa)/float(self.nGames))**x[0]
         self.guess = 0.287

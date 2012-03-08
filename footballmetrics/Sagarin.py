@@ -96,13 +96,13 @@ class Sagarin:
         for i in np.arange(0, max_iter):
             rnd = np.empty((len(self.home_team),))
             for j in np.arange (0,len(rnd)):
-            rnd[j] = random.randint(0, len(rnd)-1)
+                rnd[j] = random.randint(0, len(rnd)-1)
         
             matrix_var = np.zeros(np.shape(matrix))
             margins_var = np.zeros(np.shape(home_margins))
             for j in np.arange(0, len(rnd)):
-            matrix_var[j,:] = matrix[rnd[j],:]
-            margins_var[j] = home_margins[rnd[j]]
+                matrix_var[j,:] = matrix[rnd[j],:]
+                margins_var[j] = home_margins[rnd[j]]
         
             U, s, Vh = svd(matrix_var)
         
