@@ -1,4 +1,5 @@
 from __future__ import division
+
 import numpy as np
 import scipy.optimize
 
@@ -15,11 +16,9 @@ class Pythagorean(object):
     def __init__(self, dataDict):
         self.prediction = []
         self.power = []
-        
         self.f = lambda pf, pa, x: pf**x / (pf**x + pa**x)
         self.calculateExponent = lambda pf, pa, x: x
         self.guess = 2.0
-        
         self.teams = dataDict['teams']
         self.pointsFor = np.double(dataDict['pointsFor'])
         self.pointsAgainst = np.double(dataDict['pointsAgainst'])
@@ -31,10 +30,7 @@ class Pythagorean(object):
         Returns the optimal fit parameters retrieved from scipy.optimize.fmin 
         in calculatePythagorean().
         '''
-        try:
-            return self.xopt
-        except:
-            raise
+        return self.xopt
         
     def __minimizeParams(self, val):
         ssq = 0.
@@ -52,27 +48,26 @@ class Pythagorean(object):
         if optimize is set to True. If set to False the static exponent 
         parameters need to be given as a list.
         '''
-        try:
+        if optimize:
+            #best fit parameters
+            self.xopt = scipy.optimize.fmin(self.__minimizeParams, 
+                                            self.guess)
+        for i in range(len(self.teams)):
             if optimize:
-                self.xopt = scipy.optimize.fmin(self.__minimizeParams, self.guess)  #best fit parameters
-
-            for i in range(len(self.teams)):
-                if optimize:
-                    x = self.calculateExponent(self.pointsFor[i], 
-                                               self.pointsAgainst[i], self.xopt) #adjusted parameter per team
-                elif not optimize and staticParams != None:
-                    x = self.calculateExponent(self.pointsFor[i], 
-                                               self.pointsAgainst[i], staticParams)
-                else:
-                    x = None
-                
-                self.prediction.append(self.f(self.pointsFor[i], 
-                                              self.pointsAgainst[i], x))
-                self.power.append(x)
-                
-            return self.prediction, self.power
-        except:
-            raise
+                #adjusted parameter per team
+                x = self.calculateExponent(self.pointsFor[i], 
+                                           self.pointsAgainst[i], 
+                                           self.xopt) 
+            elif not optimize and staticParams != None:
+                x = self.calculateExponent(self.pointsFor[i], 
+                                           self.pointsAgainst[i], 
+                                           staticParams)
+            else:
+                x = None
+            self.prediction.append(self.f(self.pointsFor[i], 
+                                          self.pointsAgainst[i], x))
+            self.power.append(x)
+        return self.prediction, self.power
         
 
 class PythagoreanExpectation(Pythagorean):
@@ -82,6 +77,7 @@ class PythagoreanExpectation(Pythagorean):
     def __init__(self, dataDict):
         super(PythagoreanExpectation, self).__init__(dataDict)
         self.calculateExponent = lambda pf, pa, x: x[0]
+        self.guess = 2.0
         
 class Pythagenport(Pythagorean):
     '''
@@ -89,7 +85,8 @@ class Pythagenport(Pythagorean):
     '''
     def __init__(self, dataDict):
         super(Pythagenport, self).__init__(dataDict)
-        self.calculateExponent = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.nGames)+x[1]
+        self.calculateExponent = lambda pf, pa, x: \
+            x[0]*np.log10((pf+pa)/self.nGames)+x[1]
         self.guess = [1.5, 0.45]
         
 
@@ -99,7 +96,8 @@ class PythagenportFO(Pythagorean):
     '''
     def __init__(self, dataDict):
         super(PythagenportFO, self).__init__(dataDict)
-        self.calculateExponent = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.nGames)
+        self.calculateExponent = lambda pf, pa, x: \
+            x[0]*np.log10((pf+pa)/self.nGames)
         self.guess = 1.5
         
         
@@ -109,5 +107,6 @@ class Pythagenpat(Pythagorean):
     '''
     def __init__(self, dataDict):
         super(Pythagenpat, self).__init__(dataDict)
-        self.calculateExponent = lambda pf, pa, x: ((pf+pa)/float(self.nGames))**x[0]
+        self.calculateExponent = lambda pf, pa, x: \
+            ((pf+pa)/float(self.nGames))**x[0]
         self.guess = 0.287
