@@ -1,11 +1,86 @@
 from __future__ import division
-
-import numpy as np
-from scipy.linalg import svd, diagsvd
+import os
 import random
 
+import sqlite3
+import numpy as np
+import scipy.linalg
 
-class Sagarin:
+
+class FISB_Ratings:
+    def __init__(self, year=2011, week=17):
+        self.year = year
+        self.week = week
+                
+    def loadData(self, db_path):
+        if not os.path.isfile(db_path):
+            raise IOError('Database file not found.')
+        con = sqlite3.connect(db_path)
+        with con:
+            cur = con.cursor()
+            cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from games where year=%d and week<=%d' % (self.year, self.week))
+            self.games = cur.fetchall()
+            cur.execute('select distinct HomeTeam, AwayTeam from games where year=%d and week=%d' % (self.year, self.week))
+            res = cur.fetchall()
+        teams = []
+        for team in res:
+            if team[0] not in teams:
+                teams.append(str(team[0]).encode())
+            if team[1] not in teams:
+                teams.append(str(team[1]).encode())
+        self.teams = sorted(teams)            
+    
+    def get_home_margins(self):
+        home_margins = []
+        for game in self.games:
+            diff = float(game[-2]) - float(game[-1])
+            home_margins.append(diff)
+        return np.array(home_margins)
+            
+    def calc_sagarin(self):
+        home_margins = self.get_home_margins()
+        matrix = np.zeros( (len(self.games), len(self.teams)+1))
+        for i in range(matrix.shape[0]):
+            index_home = self.teams.index(self.games[i][0])
+            index_away = self.teams.index(self.games[i][1])
+            matrix[i, index_home] = 1
+            matrix[i, index_away] = -1
+            matrix[i, -1] = 1
+        # decompose game matrix using SVD
+        U, s, Vh = scipy.linalg.svd(matrix)
+        M = matrix.shape[0]
+        N = matrix.shape[1]
+        # extract singular values s and make diagonal matrix s_prime. 
+        # Set reciprocal of s to s_prime. Set s_prime to 0, if s < eps. 
+        s_prime = scipy.linalg.diagsvd(s,N,M)
+        eps = 1e-10
+        for i in range(N-1):
+            if s_prime[i,i] < eps:
+                s_prime[i,i] = 0
+            else:
+                s_prime[i,i] = 1/s_prime[i,i]
+        # Ax = b --> x = A^(-1) * b = Vh_t * s_prime * U_t * b 
+        x = np.mat(Vh).T * np.mat(s_prime) * np.mat(U).T * np.mat(home_margins).T
+        self.ratings = {}
+        for i in range(len(self.teams)):
+            self.ratings[self.teams[i]] = float(x[i])
+        self.sagarin_correction()
+        self.ratings['Home field advantage'] = float(x[-1])
+        return self.ratings
+    
+    def sagarin_correction(self):
+        sum = 0.0
+        for i in self.teams:
+            sum += self.ratings[i]
+
+        sum /= len(self.teams)
+        for i in self.teams:
+            self.ratings[i] -= sum
+            
+    
+    
+    
+class oldSagarin:
     def __init__(self):
         self.teams = {}
         self.rating = {}
@@ -51,11 +126,11 @@ class Sagarin:
             matrix[i, index_away] = -1
             matrix[i, -1] = 1
             
-        U, s, Vh = svd(matrix)
+        U, s, Vh = scipy.linalg.svd(matrix)
         
         M = np.shape(matrix)[0]
         N = np.shape(matrix)[1]
-        s_prime = diagsvd(s,N,M)
+        s_prime = scipy.linalg.diagsvd(s,N,M)
 
         eps = 1e-10
         for i in range(N-1):
@@ -104,11 +179,11 @@ class Sagarin:
                 matrix_var[j,:] = matrix[rnd[j],:]
                 margins_var[j] = home_margins[rnd[j]]
         
-            U, s, Vh = svd(matrix_var)
+            U, s, Vh = scipy.linalg.svd(matrix_var)
         
             M = np.shape(matrix_var)[0]
             N = np.shape(matrix_var)[1]
-            s_prime = diagsvd(s,N,M)
+            s_prime = scipy.linalg.diagsvd(s,N,M)
 
             eps = 1e-10
             for j in range(N-1):
@@ -142,3 +217,13 @@ class Sagarin:
         sum /= len(self.teams)
         for i in self.teams:
             self.rating[i] -= sum
+            
+if __name__ == '__main__':
+    db = '/Users/andy/Documents/python/Footballmetrics/nfl_games.db'
+    sag = FISB_Ratings(year=2011, week=17)
+    sag.loadData(db)
+    res = sag.calc_sagarin()
+    for key in sorted(res.keys()):
+        if key != 'Home field advantage':
+            print '%s\t%3.2f' % (key, res[key])
+    print '\n%s\t%3.2f' % ('Home field advantage', res['Home field advantage'])
