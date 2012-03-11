@@ -1,7 +1,7 @@
 PythagoreanExpectation class
 ============================
 
-.. automodule:: Pythagoreans
+.. automodule:: pythagoreans
 
 	.. autoclass:: PythagoreanExpectation
 		:members: getOptimalFitParams, calculatePythagorean

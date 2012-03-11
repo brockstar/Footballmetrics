@@ -10,17 +10,18 @@ import scipy.linalg
 class FISB_Ranking:
     '''
     This class calculates a ranking similar to Sagarin's. It uses all
-    games played in that season to determine a rating for every team and an
-    additional home field advantage.
+    games played in the season given by *year* and the given *week* 
+    to determine a rating for every team 
+    and an additional home field advantage.
     There is also the possibility for a bootstrap of the results, so that
-    the weight outliers can be reduced.  
+    the weight of potential outliers can be reduced.  
     '''
     def __init__(self, year=2011, week=17):
         self.year = year
         self.week = week
                 
     def load_data(self, db_path):
-        ''' Loads the data from a SQLite database at location db_path.'''
+        ''' Loads the data from a SQLite database at location *db_path*.'''
         if not os.path.isfile(db_path):
             raise IOError('Database file not found.')
         con = sqlite3.connect(db_path)
@@ -40,11 +41,11 @@ class FISB_Ranking:
         
     def calculate_ranking(self, bootstrapping=False, iterations=100):
         '''
-        Calculates the ranking based on the data loaded in load_data().
+        Calculates the ranking based on the data loaded in ``load_data``.
         It uses a singular value decomposition (SVD) to decompose 
         the game matrix. It returns the ratings for each team and the 
         home field advantage.
-        If bootstrapping=True, the game matrix will be randomized as often
+        If *bootstrapping* = True, the game matrix will be randomized as often
         as given in iteration.
         '''
         home_margins = self.__get_home_margins()

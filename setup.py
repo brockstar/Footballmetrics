@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='Footballmetrics',
-    version='1.0dev',
+    version='1.0',
     author='Andy Goldschmidt',
     author_email='andygoldschmidt@me.com',
     packages=['footballmetrics'],

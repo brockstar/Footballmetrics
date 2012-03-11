@@ -1,8 +1,41 @@
-===============
 Footballmetrics
 ===============
 
 Introduction
 ------------
 This package provides methods to evaluate football data.
-There is a module to create Sagarin rankings and another one to calculate different types of Pythagorean expectations.
+The package contains three modules: rankings, pythagoreans and drafttools.
+
+Installation
+------------
+The module can easily be installed in the standard way by unzipping (or untaring) it followed by:
+	
+	>>> python setup.py install
+
+Documentation
+-------------
+A HTML documentation may be found in the doc folder. Simply open it by double-clicking index.html.
+
+Footballmetrics.rankings
+------------------------
+This is an implementation of a ranking system that is based on that of Jeff Sagarin from usatoday.com.
+I used information found from all around the web and connected them to my own ranking system.
+The rankings module provides an easy way to produce fast and reliable results.
+
+Footballmetrics.pythagoreans
+----------------------------
+The Pythagorean expectation is a way to measure, how often a team should have won based one there scored points
+and the scores they suffered from their opponents. It was originally invented by Bill James for application in
+baseball, but quickly adopted for other sports such as American Football.
+This module implements three different methods of the Pythagorean expectation: the classical method, the Pythagenport
+formula and the Pythagenpat formula. In principle, it is also possible to define an own formula with this module.
+
+Fooballmetrics.drafttools:
+--------------------------
+The latest addition to the Footballmetrics package offers a way to quickly get the value of a draft based on the
+draft value chart. Also the other direction is possible, receiving the draft pick from a given value.
+
+Warranty:
+---------
+This module comes with absolutely no warranty! It was developed for private use only. The author takes _absolutely_
+no responsibility for the use of this module, not even that it works in the expected way.

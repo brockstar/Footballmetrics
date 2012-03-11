@@ -1,7 +1,7 @@
 Pythagorean class
 =================
 
-.. automodule:: Pythagoreans
+.. automodule:: pythagoreans
 
 	.. autoclass:: Pythagorean
 		:members:

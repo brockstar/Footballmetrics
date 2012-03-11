@@ -13,6 +13,7 @@ Contents:
 
    	pythagoreans.rst
    	fisb_rankings.rst
+   	drafttools.rst
 
 Indices and tables
 ==================

@@ -13,6 +13,7 @@ class DraftValue:
         self.db_path = '../draft_value_chart.db'
     
     def get_value(self, position):
+        '''Returns the value of a pick at the given *position*.'''
         if not os.path.isfile(self.db_path):
             raise IOError('Database not found. Please use set_database_path.')
         con = sqlite3.connect(self.db_path)
@@ -27,6 +28,7 @@ class DraftValue:
         return value
 
     def get_position(self,value):
+        '''Returns the draft pick for a given *value*.'''
         con = sqlite3.connect(self.db_path)
         with con:
             cur = con.cursor()
@@ -39,6 +41,10 @@ class DraftValue:
         return position
     
     def set_database_path(self, path):
+        '''
+        Use this method to set the path to the database, if it defers
+        from default.
+        '''
         if os.path.isfile(path):
             self.db_path = path
         else:

@@ -1,2 +1,5 @@
-include *.txt
-recursive-include docs *.txt
+include *.db
+recursive-include doc *.txt
+recursive-include doc *.*
+recursive-exclude doc *.rst
+recursive-exclude doc *.py
