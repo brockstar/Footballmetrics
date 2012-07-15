@@ -12,19 +12,46 @@ class SOS(object):
 
     def calculate(self, method='average'):
         if method == 'average':
-            self.__calc_avg()
-        elif method == 'weighted_average':
-            self.__calc_weighted_avg()
+            return self.__calc_avg()
+        elif method == 'scaled_average':
+            return self.__calc_scaled_avg()
         elif method == 'bcs':
             return self.__calc_bcs()
         else:
             raise ValueError("Method %s doesn't exist." % method)
 
     def __calc_avg(self):
-        print 'Not implemented yet.'
+        opponents = self.__get_opponents(self.team)
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        total_rating = 0.
+        for team in opponents:
+            cmd = 'select Rating from rankings where team="%s" and year=%d and week=%s' % (team, self.year, self.week)
+            cur.execute(cmd)
+            temp = cur.fetchall()[0]
+            total_rating += temp[0]
+        con.close()
+        avg_rating = total_rating / len(opponents)
+        return avg_rating
 
-    def __calc_weighted_avg(self):
-        print 'Not implemented yet.'
+    def __calc_scaled_avg(self):
+        opponents = self.__get_opponents(self.team)
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute('select max(Rating) from rankings where year=%d and week=%d' % (self.year, self.week))
+        r_max = cur.fetchone()[0]
+        cur.execute('select min(Rating) from rankings where year=%d and week=%d' % (self.year, self.week))
+        r_min = cur.fetchone()[0]
+        total_rating = 0.
+        for team in opponents:
+            cmd = 'select Rating from rankings where team="%s" and year=%d and week=%s' % (team, self.year, self.week)
+            cur.execute(cmd)
+            temp = cur.fetchall()[0]
+            total_rating += temp[0]
+        con.close()
+        f = lambda x: x / (r_max - r_min) - r_min / (r_max - r_min)
+        scaled_rating = f(total_rating / len(opponents))
+        return scaled_rating
 
     def __calc_bcs(self):
         # Calculate W-L record of opponents
