@@ -16,29 +16,38 @@ class FISB_Ranking:
     There is also the possibility for a bootstrap of the results, so that
     the weight of potential outliers can be reduced.  
     '''
-    def __init__(self, year=2011, week=17):
+    def __init__(self, year=None, week=None):
         self.year = year
         self.week = week
                 
-    def load_data(self, db_path):
+    def load_data(self, db_path, table='games'):
         ''' Loads the data from a SQLite database at location *db_path*.'''
         if not os.path.isfile(db_path):
-            raise IOError('Database file not found.')
-        con = sqlite3.connect(db_path)
-        with con:
-            cur = con.cursor()
-            cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore \
-                from games where year=%d and week<=%d' % 
-                (self.year, self.week))
-            self.games = cur.fetchall()
-        teams = []
-        for game in self.games:
-            if game[0] not in teams:
-                teams.append(str(game[0]).encode())
-            if game[1] not in teams:
-                teams.append(str(game[1]).encode())
-        self.teams = sorted(teams) 
-        
+            print 'Database file not found.'
+        else:
+            con = sqlite3.connect(db_path)
+            with con:
+                cur = con.cursor()
+                if self.year is not None and self.week is not None:
+                    cmd = '''select HomeTeam, AwayTeam, HomeScore, AwayScore
+                             from %s where Year=%d and Week<=%d''' % \
+                             (table, self.year, self.week)
+                elif self.year is not None and self.week is None:
+                    cmd = '''select HomeTeam, AwayTeam, HomeScore, AwayScore
+                             from %s where Year=%d''' % (table, self.year)
+                else:
+                    cmd = '''select HomeTeam, AwayTeam, HomeScore, AwayScore
+                           from %s''' % (table)
+                cur.execute(cmd)
+                self.games = cur.fetchall()
+            teams = []
+            for game in self.games:
+                if game[0] not in teams:
+                    teams.append(str(game[0]).encode())
+                if game[1] not in teams:
+                    teams.append(str(game[1]).encode())
+            self.teams = sorted(teams) 
+
     def calculate_ranking(self, bootstrapping=False, iterations=100):
         '''
         Calculates the ranking based on the data loaded in ``load_data``.
