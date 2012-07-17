@@ -22,7 +22,7 @@ class Pythagorean(object):
 	
     def __init__(self, year, week):
         self.prediction = {}
-        self.power = []
+        self.power = {}
         self.__f = lambda pf, pa, x: pf**x / (pf**x + pa**x)
         self.calculateExponent = lambda pf, pa, x: x
         self.guess = 2.0
@@ -85,7 +85,7 @@ class Pythagorean(object):
             self.prediction[self.__teams[i]] = self.__f(self.__pointsFor[i], 
                                                         self.__pointsAgainst[i], 
                                                         x)
-            self.power.append(x)
+            self.power[self.__teams[i]] = x
         return self.prediction, self.power
         
     def __get_wlp(self, vals):
