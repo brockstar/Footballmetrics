@@ -4,6 +4,7 @@ import numpy as np
 import scipy.optimize
 import sqlite3
 
+
 class Pythagorean(object):
     '''
     This is a super class for the different types of the 
@@ -20,7 +21,7 @@ class Pythagorean(object):
 #        self.wlp = np.double(dataDict['wlp'])
 #        self.nGames = np.int(dataDict['nGames'])
 	
-    def __init__(self, year, week):
+    def __init__(self, year, week, db_path, db_table='standings'):
         self.prediction = {}
         self.power = {}
         self.__f = lambda pf, pa, x: pf**x / (pf**x + pa**x)
@@ -33,13 +34,15 @@ class Pythagorean(object):
         self.__pointsAgainst = []
         self.__wlp = []
         self.nGames = 0
+        self.__load_data(db_path, db_table)
 
-    def load_data(self, db_path):
+    def __load_data(self, db_path, db_table):
         con = sqlite3.connect(db_path)
         cur = con.cursor()
-        cmd = 'select Team, PointFor, PointsAgainst, Win, Loss, Tie from standings where Year=%d and Week=%d' % (self.__year, self.__week)
+        cmd = 'select Team, PointsFor, PointsAgainst, Win, Loss, Tie from %s where Year=%d and Week=%d' % (db_table, self.__year, self.__week)
         cur.execute(cmd)
         tmp = cur.fetchall()
+        con.close()
         for row in tmp:
             self.__teams.append(row[0])
             self.__pointsFor.append(row[1])
@@ -107,8 +110,8 @@ class PythagoreanExpectation(Pythagorean):
     '''
     Implementation of the classical Pythagorean expectation.
     '''
-    def __init__(self, year, week):
-        super(PythagoreanExpectation, self).__init__(year, week)
+    def __init__(self, year, week, db_path, db_table='standings'):
+        super(PythagoreanExpectation, self).__init__(year, week, db_path, db_table='standings')
         self.calculateExponent = lambda pf, pa, x: x[0]
         self.guess = 2.0
 
@@ -117,8 +120,8 @@ class Pythagenport(Pythagorean):
     '''
     Implementation of Clay Davenport's Pythagenport formula.
     '''
-    def __init__(self, year, week):
-        super(Pythagenport, self).__init__(year, week)
+    def __init__(self, year, week, db_path, db_table='standings'):
+        super(Pythagenport, self).__init__(year, week, db_path, db_table='standings')
         self.calculateExponent = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.nGames)+x[1]
         self.guess = [1.5, 0.45]
         
@@ -127,8 +130,8 @@ class PythagenportFO(Pythagorean):
     '''
     Implementation of Football Outsiders' Pythagenport formula.
     '''
-    def __init__(self, year, week):
-        super(PythagenportFO, self).__init__(year, week)
+    def __init__(self, year, week, db_path, db_table='standings'):
+        super(PythagenportFO, self).__init__(year, week, db_path, db_table='standings')
         self.calculateExponent = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.nGames)
         self.guess = 1.5
         
@@ -137,7 +140,7 @@ class Pythagenpat(Pythagorean):
     '''
     Implementation of David Smyth's Pythagenpat formula.
     '''
-    def __init__(self, year, week):
-        super(Pythagenpat, self).__init__(year, week)
+    def __init__(self, year, week, db_path, db_table='standings'):
+        super(Pythagenpat, self).__init__(year, week, db_path, db_table='standings')
         self.calculateExponent = lambda pf, pa, x: ((pf+pa)/float(self.nGames))**x[0]
         self.guess = 0.287

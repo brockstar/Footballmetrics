@@ -16,14 +16,15 @@ class FISB_Ranking:
     There is also the possibility for a bootstrap of the results, so that
     the weight of potential outliers can be reduced.  
     '''
-    def __init__(self, year=None, week=None):
+    def __init__(self, year, week, db_path, db_table='games'):
         self.year = year
         self.week = week
+        self.__load_data(db_path, db_table)
                 
-    def load_data(self, db_path, table='games'):
+    def __load_data(self, db_path, db_table):
         ''' Loads the data from a SQLite database at location *db_path*.'''
         if not os.path.isfile(db_path):
-            print 'Database file not found.'
+            print('Database file not found.')
         else:
             con = sqlite3.connect(db_path)
             with con:
@@ -31,10 +32,10 @@ class FISB_Ranking:
                 if self.year is not None and self.week is not None:
                     cmd = '''select HomeTeam, AwayTeam, HomeScore, AwayScore
                              from %s where Year=%d and Week<=%d''' % \
-                             (table, self.year, self.week)
+                             (db_table, self.year, self.week)
                 elif self.year is not None and self.week is None:
                     cmd = '''select HomeTeam, AwayTeam, HomeScore, AwayScore
-                             from %s where Year=%d''' % (table, self.year)
+                             from %s where Year=%d''' % (db_table, self.year)
                 else:
                     cmd = '''select HomeTeam, AwayTeam, HomeScore, AwayScore
                            from %s''' % (table)
@@ -43,9 +44,9 @@ class FISB_Ranking:
             teams = []
             for game in self.games:
                 if game[0] not in teams:
-                    teams.append(str(game[0]).encode())
+                    teams.append(str(game[0]))
                 if game[1] not in teams:
-                    teams.append(str(game[1]).encode())
+                    teams.append(str(game[1]))
             self.teams = sorted(teams) 
 
     def calculate_ranking(self, bootstrapping=False, iterations=100):
@@ -63,7 +64,7 @@ class FISB_Ranking:
             random_x = []
             # randomly pick games and create new game matrix with these
             # randomized games
-            for n in xrange(iterations):
+            for n in range(iterations):
                 # list contains random indices of games to be chosen
                 #random_list = []
                 random_list = [random.randint(0, len(self.games)-1) 
@@ -81,7 +82,7 @@ class FISB_Ranking:
         else:
             x = self.__decompose_matrix(game_matrix, home_margins)
         self.ratings = {}
-        for i in xrange(len(self.teams)):
+        for i in range(len(self.teams)):
             self.ratings[self.teams[i]] = float(x[i])
         self.ratings = self.__normalize(self.ratings)
         self.ratings['Home field advantage'] = float(x[-1])
@@ -95,7 +96,7 @@ class FISB_Ranking:
         # rows = games
         # columns = teams + home field advantage
         matrix = np.zeros((len(self.games), len(self.teams)+1))
-        for i in xrange(matrix.shape[0]):
+        for i in range(matrix.shape[0]):
             index_home = self.teams.index(self.games[i][0])
             index_away = self.teams.index(self.games[i][1])
             # game = home score - away score + home field advantage
@@ -110,7 +111,7 @@ class FISB_Ranking:
         # extract singular values s and make diagonal game_matrix s_prime. 
         # Set reciprocal of s to s_prime. Set s_prime to 0, if s < eps. 
         s_prime = scipy.linalg.diagsvd(s, matrix.shape[1], matrix.shape[0])
-        for i in xrange(matrix.shape[1]-1):
+        for i in range(matrix.shape[1]-1):
             if s_prime[i,i] < eps:
                 s_prime[i,i] = 0
             else:
@@ -122,9 +123,9 @@ class FISB_Ranking:
     
     def __normalize(self, ratings):
         sum = 0.0
-        for team in ratings.iterkeys():
+        for team in ratings.keys():
             sum += ratings[team]
         sum /= len(self.teams)
-        for team in ratings.iterkeys():
+        for team in ratings.keys():
             ratings[team] -= sum
         return ratings
