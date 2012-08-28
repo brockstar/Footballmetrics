@@ -3,12 +3,20 @@ from __future__ import division
 import sqlite3
 
 class SOS(object):
-    def __init__(self, team, year=None, week=None, db_path=None, db_table=None):
+    def __init__(self, team, year=None, week=None, db_path=None, db_path_schedule=None, db_path_standings=None, standings_year=None):
         self.team = team
         self.year = year
         self.week = week
         self.db_path = db_path
-        self.db_table = db_table
+        self.db_path_schedule = db_path_schedule
+        if db_path_standings is None:
+            self.db_path_standings = self.db_path_schedule
+        else:
+            self.db_path_standings = db_path_standings
+        if standings_year is None:
+            self.standings_year = self.year
+        else:
+            self.standings_year = standings_year
 
     def calculate(self, method='average'):
         if method == 'average':
@@ -26,7 +34,7 @@ class SOS(object):
         cur = con.cursor()
         total_rating = 0.
         for team in opponents:
-            cmd = 'select Rating from rankings where team="%s" and year=%d and week=%s' % (team, self.year, self.week)
+            cmd = 'select Rating from rankings where team="%s" and year=%d and week=%s' % (team, self.standings_year, self.week)
             cur.execute(cmd)
             temp = cur.fetchall()[0]
             total_rating += temp[0]
@@ -73,11 +81,11 @@ class SOS(object):
         con = sqlite3.connect(self.db_path)
         cur = con.cursor()
         cmd = 'select %s from %s where Year=%d and Week<=%d and %s="%s"' % \
-            ('HomeTeam', self.db_table, self.year, self.week, 'AwayTeam', team)
+            ('HomeTeam', self.db_path_schedule, self.year, self.week, 'AwayTeam', team)
         cur.execute(cmd)
         opponents = [str(i[0]) for i in cur.fetchall()]
         cmd = 'select %s from %s where Year=%d and Week<=%d and %s="%s"' % \
-            ('AwayTeam', self.db_table, self.year, self.week, 'HomeTeam', team)
+            ('AwayTeam', self.db_path_schedule, self.year, self.week, 'HomeTeam', team)
         cur.execute(cmd)
         opponents += [str(i[0]) for i in cur.fetchall() if str(i[0]) not in opponents]
         con.close()
@@ -89,7 +97,7 @@ class SOS(object):
         total_wins = 0
         total_games = 0
         for team in teams:
-            cmd = 'select Win, Loss, Tie from standings where team="%s" and year=%d and week=%s' % (team, self.year, self.week)
+            cmd = 'select Win, Loss, Tie from %s where team="%s" and year=%d and week=%s' % (self.db_path_standings, team, self.standings_year, self.week)
             cur.execute(cmd)
             temp = cur.fetchall()[0]
             total_wins += temp[0] 

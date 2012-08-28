@@ -7,7 +7,7 @@ import numpy as np
 import scipy.linalg
 
 
-class FISB_Ranking:
+class FISB_Ranking(object):
     '''
     This class calculates a ranking similar to Sagarin's. It uses all
     games played in the season given by *year* and the given *week* 
@@ -129,3 +129,68 @@ class FISB_Ranking:
         for team in ratings.keys():
             ratings[team] -= sum
         return ratings
+
+
+class ML_Rating(object):
+    def __init__(self, year, week, db_path, db_games_table='games', db_standings_table='standings'):
+        self.year = year
+        self.week = week
+        self.db_path = db_path
+        self.db_games_table = db_games_table
+        self.db_standings_table = db_standings_table
+
+    def load_data(self):
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self.db_games_table, self.year, self.week))
+        games = cur.fetchall()
+        con.close()
+        teams = []
+        for game in games:
+            if game[0] not in teams:
+                teams.append(str(game[0]))
+            if game[1] not in teams:
+                teams.append(str(game[1]))
+        self.teams = sorted(teams)
+        self.team_games = {}
+        for team in self.teams:
+            self.team_games[team] = []
+            for game in games:
+                if str(game[0]) == team:
+                    self.team_games[team] += [str(game[1])]
+                elif str(game[1]) == team:
+                    self.team_games[team] += [str(game[0])]
+
+    def get_wins(self):
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute('select team, win from {} where year={} and week={}'.format(self.db_standings_table, self.year, self.week))
+        team_wins = {}
+        for row in cur.fetchall():
+            team_wins[row[0]] = int(row[1])
+        con.close()
+        return team_wins
+
+    def calculate_ranking(self):
+        rating = dict(zip(self.teams, np.ones((len(self.teams)))))
+        new_rating = {}
+        wins = self.get_wins()
+        ssq = 1
+        max_iter = 100
+        i = 0
+        while ssq > 1e-3 and i < max_iter:
+            for team in self.teams:
+                denom = 0
+                for opp in self.team_games[team]:
+                    denom += 1.0 / (rating[team] + rating[opp])
+                
+                new_rating[team] = wins[team] / denom
+            ssq = 0.0
+            for team in self.teams:
+                ssq += (rating[team] - new_rating[team]) ** 2
+                rating[team] = new_rating[team]
+                print '%s: %3.2f' % (team, rating[team])
+            print 'Iteration: %d' % i
+            print 'SSQ: %3.2e\n' % ssq
+            i += 1
+        return rating
