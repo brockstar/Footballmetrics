@@ -244,18 +244,21 @@ class SRS(object):
         ssq = 1.
         max_iter = 100
         mov, n_games = self.__get_margin_of_victory()
-        rating = mov.copy()
-        new_rating = {}
+        srs = mov.copy()
+        new_srs = {}
         i = 0
         while ssq > 1e-3 and i <= max_iter:
             ssq = 0.0
             for team in self.teams:
-                new_rating[team] = mov[team] + sum(rating[opp] for opp in self.team_games[team]) / n_games[team]
+                new_srs[team] = mov[team] + sum(srs[opp] for opp in self.team_games[team]) / n_games[team]
             for team in self.teams:
-                ssq += (new_rating[team] - rating[team]) ** 2
-                rating[team] = new_rating[team]
+                ssq += (new_srs[team] - srs[team]) ** 2
+                srs[team] = new_srs[team]
             i += 1
         if i == max_iter:
             print 'Warning: Maximum number of iterations reached. Current sum squared error is %3.3e' % ssq
-        return rating
+        sos = {}
+        for team in self.teams:
+            sos[team] = srs[team] - mov[team]
+        return srs, mov, sos
             
