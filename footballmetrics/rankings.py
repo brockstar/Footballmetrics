@@ -138,8 +138,9 @@ class ML_Rating(object):
         self.db_path = db_path
         self.db_games_table = db_games_table
         self.db_standings_table = db_standings_table
+        self.__load_data()
 
-    def load_data(self):
+    def __load_data(self):
         con = sqlite3.connect(self.db_path)
         cur = con.cursor()
         cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self.db_games_table, self.year, self.week))
@@ -161,7 +162,7 @@ class ML_Rating(object):
                 elif str(game[1]) == team:
                     self.team_games[team] += [str(game[0])]
 
-    def get_wins(self):
+    def __get_wins(self):
         con = sqlite3.connect(self.db_path)
         cur = con.cursor()
         cur.execute('select team, win from {} where year={} and week={}'.format(self.db_standings_table, self.year, self.week))
@@ -174,23 +175,87 @@ class ML_Rating(object):
     def calculate_ranking(self):
         rating = dict(zip(self.teams, np.ones((len(self.teams)))))
         new_rating = {}
-        wins = self.get_wins()
+        wins = self.__get_wins()
         ssq = 1
         max_iter = 100
         i = 0
+        dummy_rating = 1.0
         while ssq > 1e-3 and i < max_iter:
             for team in self.teams:
                 denom = 0
                 for opp in self.team_games[team]:
                     denom += 1.0 / (rating[team] + rating[opp])
-                
-                new_rating[team] = wins[team] / denom
+                # dummy win and loss!!!
+                denom += 2.0 / (rating[team] + dummy_rating)
+                new_rating[team] = (wins[team] + 1) / denom
             ssq = 0.0
             for team in self.teams:
                 ssq += (rating[team] - new_rating[team]) ** 2
                 rating[team] = new_rating[team]
-                print '%s: %3.2f' % (team, rating[team])
-            print 'Iteration: %d' % i
-            print 'SSQ: %3.2e\n' % ssq
             i += 1
         return rating
+
+
+class SRS(object):
+    def __init__(self, year, week, db_path, db_games_table='games', db_standings_table='standings'):
+        self.year = year
+        self.week = week
+        self.db_path = db_path
+        self.db_games_table = db_games_table
+        self.db_standings_table = db_standings_table
+        self.__load_data()
+
+    def __load_data(self):
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self.db_games_table, self.year, self.week))
+        games = cur.fetchall()
+        con.close()
+        teams = []
+        for game in games:
+            if game[0] not in teams:
+                teams.append(str(game[0]))
+            if game[1] not in teams:
+                teams.append(str(game[1]))
+        self.teams = sorted(teams)
+        self.team_games = {}
+        for team in self.teams:
+            self.team_games[team] = []
+            for game in games:
+                if str(game[0]) == team:
+                    self.team_games[team] += [str(game[1])]
+                elif str(game[1]) == team:
+                    self.team_games[team] += [str(game[0])]
+
+    def __get_margin_of_victory(self):
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute('select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self.year, self.week))
+        mov = {}
+        n_games = {}
+        for row in cur.fetchall():
+            n_games[str(row[0])] = sum((int(row[1]), int(row[2]), int(row[3])))
+            m = (int(row[4]) - int(row[5])) / n_games[str(row[0])]
+            mov[str(row[0])] = m
+        self.mov = mov
+        return mov, n_games
+
+    def calculate_ranking(self):
+        ssq = 1.
+        max_iter = 100
+        mov, n_games = self.__get_margin_of_victory()
+        rating = mov.copy()
+        new_rating = {}
+        i = 0
+        while ssq > 1e-3 and i <= max_iter:
+            ssq = 0.0
+            for team in self.teams:
+                new_rating[team] = mov[team] + sum(rating[opp] for opp in self.team_games[team]) / n_games[team]
+            for team in self.teams:
+                ssq += (new_rating[team] - rating[team]) ** 2
+                rating[team] = new_rating[team]
+            i += 1
+        if i == max_iter:
+            print 'Warning: Maximum number of iterations reached. Current sum squared error is %3.3e' % ssq
+        return rating
+            
