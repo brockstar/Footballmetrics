@@ -131,7 +131,7 @@ class FISB_Ranking(object):
         return ratings
 
 
-class ML_Rating(object):
+class ML_Ranking(object):
     def __init__(self, year, week, db_path, db_games_table='games', db_standings_table='standings'):
         self.year = year
         self.week = week
