@@ -237,7 +237,7 @@ class SRS(object):
             n_games[str(row[0])] = sum((int(row[1]), int(row[2]), int(row[3])))
             m = (int(row[4]) - int(row[5])) / n_games[str(row[0])]
             mov[str(row[0])] = m
-        self.mov = mov
+        con.close()
         return mov, n_games
 
     def __get_offense_averages(self):
@@ -258,6 +258,7 @@ class SRS(object):
         for team in points_for.keys():
             points_for[team] -= pf_avg
             points_against[team] -= pa_avg
+        con.close()
         return points_for, points_against, n_games
 
     def calculate_ranking(self, type='normal'):
