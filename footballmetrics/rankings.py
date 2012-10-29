@@ -240,11 +240,38 @@ class SRS(object):
         self.mov = mov
         return mov, n_games
 
-    def calculate_ranking(self):
+    def __get_offense_averages(self):
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute('select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self.year, self.week))
+        points_for = {}
+        points_against = {}
+        n_games = {}
+        for row in cur.fetchall():
+            n_games[str(row[0])] = sum((int(row[1]), int(row[2]), int(row[3])))
+            pf = int(row[4]) / n_games[str(row[0])]
+            points_for[str(row[0])] = pf
+            pa = int(row[5]) / n_games[str(row[0])]
+            points_against[str(row[0])] = pa
+        pf_avg = np.mean(points_for.values())
+        pa_avg = np.mean(points_against.values())
+        for team in points_for.keys():
+            points_for[team] -= pf_avg
+            points_against[team] -= pa_avg
+        return points_for, points_against, n_games
+
+    def calculate_ranking(self, type='normal'):
         ssq = 1.
         max_iter = 100
-        mov, n_games = self.__get_margin_of_victory()
-        srs = mov.copy()
+        if type == 'normal':
+            mov, n_games = self.__get_margin_of_victory()
+            srs = mov.copy()
+        elif type == 'offense':
+            mov, def_mov, n_games = self.__get_offense_averages()
+            srs = def_mov
+        elif type == 'defense':
+            off_mov, mov, n_games = self.__get_offense_averages()
+            srs = off_mov
         new_srs = {}
         i = 0
         while ssq > 1e-3 and i <= max_iter:
