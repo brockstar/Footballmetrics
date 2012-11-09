@@ -56,10 +56,62 @@ class OffenseEfficiency(object):
             Ypred = pred_rush(Xpred)
         if norm:
             Ypred -= Ypred.mean()
-        s = 'Prediction'
+        s = 'Prediction_Off'
         if pred_type == 'pass' or pred_type == 'rush':
             s += '_' + pred_type
         data[s] = Ypred
+        if ret == 'pd':
+            return_data = data
+        elif ret == 'np':
+            return_data = Ypred
+        return return_data
+
+
+class DefenseEfficiency(object):
+    def __init__(self, train_data_path=None):
+        '''
+        The DefenseEfficiency class creates a score based on
+        net yards per pass attempt, interception rate and yards per rush attempt.
+        '''
+        self.__train(train_data_path)
+
+    def __load_predictors(self, data):
+        predictors = sm.add_constant(np.column_stack((data['NY/A'],
+                                                      data['Int'] / data['PassAtt'],
+                                                      data['RushYds'] / data['RushAtt'])))
+        return predictors
+    def __train(self, train_data_path):
+        if train_data_path is not None:
+            try:
+                data = pd.read_csv(train_data_path, index_col='Tm')
+            except IOError, e:
+                print('IOError: %s' % e)
+        else:
+            try:
+                data = pd.read_csv('../def_team_efficiency.csv', index_col='Tm')
+            except IOError, e:
+                print('IOError: %s' % e)
+        data['intercept'] = 1.0
+        X = self.__load_predictors(data)
+        Y = data['Pts'] / data['G']
+        model = sm.OLS(Y, X)
+        self.__fit = model.fit()
+        print('Model successfully created.')
+
+    def predict(self, data, norm=False, ret='pd'):
+        '''
+        Predicts efficiency for *data*.
+        If *norm* = True, results will be normalized to mean = 0.
+        *ret* = {'pd', 'np'} determines if pandas object
+        or NumPy array will be returned.
+        '''
+        data = pd.DataFrame(data)
+        Xpred = self.__load_predictors(data)
+        params = self.__fit.params
+        Ypred = self.__fit.predict(Xpred)
+        if norm:
+            Ypred -= Ypred.mean()
+        data['Prediction_Def'] = Ypred
         if ret == 'pd':
             return_data = data
         elif ret == 'np':
