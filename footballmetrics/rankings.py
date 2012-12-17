@@ -1,10 +1,14 @@
 from __future__ import division
-import os
-import random
 
+import os
+import multiprocessing as mp
 import sqlite3
+
 import numpy as np
-import scipy.linalg
+# import some methods independently for faster decomposition
+from numpy import shape, dot
+from numpy.random import randint
+from scipy.linalg import svd, diagsvd
 
 
 class FISB_Ranking(object):
@@ -17,39 +21,39 @@ class FISB_Ranking(object):
     the weight of potential outliers can be reduced.  
     '''
     def __init__(self, year, week, db_path, db_table='games'):
-        self.year = year
-        self.week = week
-        self.__load_data(db_path, db_table)
+        self._year = year
+        self._week = week
+        self._load_data(db_path, db_table)
                 
-    def __load_data(self, db_path, db_table):
+    def _load_data(self, db_path, db_table):
         ''' Loads the data from a SQLite database at location *db_path*.'''
-        if not os.path.isfile(db_path):
-            print('Database file not found.')
-        else:
+        if os.path.isfile(db_path):
             con = sqlite3.connect(db_path)
             with con:
                 cur = con.cursor()
-                if self.year is not None and self.week is not None:
+                if self._year is not None and self._week is not None:
                     cmd = '''select HomeTeam, AwayTeam, HomeScore, AwayScore
                              from %s where Year=%d and Week<=%d''' % \
-                             (db_table, self.year, self.week)
-                elif self.year is not None and self.week is None:
+                             (db_table, self._year, self._week)
+                elif self._year is not None and self._week is None:
                     cmd = '''select HomeTeam, AwayTeam, HomeScore, AwayScore
-                             from %s where Year=%d''' % (db_table, self.year)
+                             from %s where Year=%d''' % (db_table, self._year)
                 else:
                     cmd = '''select HomeTeam, AwayTeam, HomeScore, AwayScore
-                           from %s''' % (table)
+                           from %s''' % (db_table)
                 cur.execute(cmd)
-                self.games = cur.fetchall()
+                self._games = cur.fetchall()
             teams = []
-            for game in self.games:
+            for game in self._games:
                 if game[0] not in teams:
                     teams.append(str(game[0]))
                 if game[1] not in teams:
                     teams.append(str(game[1]))
-            self.teams = sorted(teams) 
+            self._teams = sorted(teams)
+        else:
+            raise IOError('Database not found.')
 
-    def calculate_ranking(self, bootstrapping=False, iterations=100):
+    def calculate_ranking(self, bootstrapping=False, iterations=100, nprocs=2):
         '''
         Calculates the ranking based on the data loaded in ``load_data``.
         It uses a singular value decomposition (SVD) to decompose 
@@ -58,92 +62,101 @@ class FISB_Ranking(object):
         If *bootstrapping* = True, the game matrix will be randomized as often
         as given in iteration.
         '''
-        home_margins = self.__get_home_margins()
-        game_matrix = self.__get_game_matrix()
-        if bootstrapping and iterations > 0:
-            random_x = []
-            # randomly pick games and create new game matrix with these
-            # randomized games
-            for n in range(iterations):
-                # list contains random indices of games to be chosen
-                #random_list = []
-                random_list = [random.randint(0, len(self.games)-1) 
-                               for N in self.games]
-                # generate a random game matrix and random home_margins
-                # and solve the equation system for each iteration.
-                random_game_matrix = np.zeros(game_matrix.shape)
-                random_margins = np.zeros(home_margins.shape)
-                for i in random_list:
-                    random_game_matrix[i,:] = game_matrix[random_list[i], :]
-                    random_margins[i] = home_margins[random_list[i]]
-                random_x.append(self.__decompose_matrix(random_game_matrix,
-                                                       random_margins))
-            x = np.mean(random_x, axis=0)
+        home_margins = self._get_home_margins()
+        game_matrix = self._get_game_matrix()
+        # _svd_filter is a simple function to take care of zero values in the sigma
+        # vector of the decomposition. It should be vectorized outside __decompose_matrix().
+        self._svd_filter = np.vectorize(lambda x: 0 if x < 1e-10 else 1 / x)
+        if bootstrapping and iterations <= 0:
+            raise ValueError('Number of iterations needs to be positive integer number.')
+        if bootstrapping:
+            random_results = self._bootstrap_games(game_matrix, home_margins, 
+                    iterations, nprocs)
+            x = np.mean(random_results, axis=0)
         else:
-            x = self.__decompose_matrix(game_matrix, home_margins)
-        self.ratings = {}
-        for i in range(len(self.teams)):
-            self.ratings[self.teams[i]] = float(x[i])
-        self.ratings = self.__normalize(self.ratings)
+            x = self._decompose_matrix(game_matrix, home_margins)
+        self.ratings = dict(zip(self._teams, x))
+        self.ratings = self._normalize(self.ratings)
         self.ratings['Home field advantage'] = float(x[-1])
         return self.ratings           
-    
-    def __get_home_margins(self):
-        home_margins = [float(x[-2]) - float(x[-1]) for x in self.games]
-        return np.array(home_margins)
 
-    def __get_game_matrix(self):
+    def _bootstrap_games(self, game_matrix, home_margins, iterations, nprocs=2):
+        def worker(N, out_q):
+            result = []
+            for i in xrange(N):
+                matrix, margins = self._randomize_matrix(game_matrix, home_margins)
+                res = self._decompose_matrix(matrix, margins)
+                result += [res]
+            out_q.put(result)
+        out_q = mp.Queue()
+        N = int(np.ceil(iterations / float(nprocs)))
+        procs = []
+        for i in xrange(nprocs):
+            p = mp.Process(target=worker, args=(N, out_q, ))
+            procs.append(p)
+            p.start()
+        results = []
+        for i in xrange(nprocs):
+            results += list(out_q.get())
+        for p in procs:
+            p.join()
+        return results
+
+    def _randomize_matrix(self, game_matrix, home_margins):
+        rand_idx = randint(0, len(game_matrix), len(game_matrix))
+        random_matrix = game_matrix[rand_idx]
+        random_margins = home_margins[rand_idx]
+        return random_matrix, random_margins
+    
+    def _get_home_margins(self):
+        home_margins = np.array([float(x[-2]) - float(x[-1]) for x in self._games])
+        return home_margins
+
+    def _get_game_matrix(self):
         # rows = games
         # columns = teams + home field advantage
-        matrix = np.zeros((len(self.games), len(self.teams)+1))
+        matrix = np.zeros((len(self._games), len(self._teams)+1))
+        # To faster access index for every team create dict with indices for every team
+        idx = {k:i for i, k in enumerate(self._teams)}
         for i in range(matrix.shape[0]):
-            index_home = self.teams.index(self.games[i][0])
-            index_away = self.teams.index(self.games[i][1])
+            index_home = idx[self._games[i][0]]
+            index_away = idx[self._games[i][1]]
             # game = home score - away score + home field advantage
             matrix[i, index_home] = 1
             matrix[i, index_away] = -1
             matrix[i, -1] = 1
         return matrix
     
-    def __decompose_matrix(self, matrix, margins, eps=1e-10):
+    def _decompose_matrix(self, matrix, margins):
         # decompose game game_matrix using SVD
-        U, s, Vh = scipy.linalg.svd(matrix)
+        U, s, Vh = svd(matrix)
         # extract singular values s and make diagonal game_matrix s_prime. 
-        # Set reciprocal of s to s_prime. Set s_prime to 0, if s < eps. 
-        s_prime = scipy.linalg.diagsvd(s, matrix.shape[1], matrix.shape[0])
-        for i in range(matrix.shape[1]-1):
-            if s_prime[i,i] < eps:
-                s_prime[i,i] = 0
-            else:
-                s_prime[i,i] = 1 / s_prime[i,i]
+        s = self._svd_filter(s)
+        s_prime = diagsvd(s, shape(matrix)[1], shape(matrix)[0])
         # Ax = b --> x = A^(-1) * b = Vh_t * s_prime * U_t * b 
-        x = np.mat(Vh).T * np.mat(s_prime) * np.mat(U).T * \
-            np.mat(margins).T
+        # It looks a bit strange with np.dot but it's significantly faster than mat(Vh) * ...
+        x = dot(dot(dot(Vh.T, s_prime), U.T), margins.T)
         return x
-    
-    def __normalize(self, ratings):
-        sum = 0.0
-        for team in ratings.keys():
-            sum += ratings[team]
-        sum /= len(self.teams)
-        for team in ratings.keys():
-            ratings[team] -= sum
+
+    def _normalize(self, ratings):
+        rating_sum = np.sum(ratings.values()) / len(self._teams) 
+        ratings = {k: v - rating_sum for k, v in ratings.iteritems()}
         return ratings
 
 
 class ML_Ranking(object):
     def __init__(self, year, week, db_path, db_games_table='games', db_standings_table='standings'):
-        self.year = year
-        self.week = week
+        self._year = year
+        self._week = week
         self.db_path = db_path
         self.db_games_table = db_games_table
         self.db_standings_table = db_standings_table
-        self.__load_data()
+        self._load_data()
 
-    def __load_data(self):
+    def _load_data(self):
         con = sqlite3.connect(self.db_path)
         cur = con.cursor()
-        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self.db_games_table, self.year, self.week))
+        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self.db_games_table, self._year, self._week))
         games = cur.fetchall()
         con.close()
         teams = []
@@ -152,9 +165,9 @@ class ML_Ranking(object):
                 teams.append(str(game[0]))
             if game[1] not in teams:
                 teams.append(str(game[1]))
-        self.teams = sorted(teams)
+        self._teams = sorted(teams)
         self.team_games = {}
-        for team in self.teams:
+        for team in self._teams:
             self.team_games[team] = []
             for game in games:
                 if str(game[0]) == team:
@@ -162,10 +175,10 @@ class ML_Ranking(object):
                 elif str(game[1]) == team:
                     self.team_games[team] += [str(game[0])]
 
-    def __get_wins(self):
+    def _get_wins(self):
         con = sqlite3.connect(self.db_path)
         cur = con.cursor()
-        cur.execute('select team, win from {} where year={} and week={}'.format(self.db_standings_table, self.year, self.week))
+        cur.execute('select team, win from {} where year={} and week={}'.format(self.db_standings_table, self._year, self._week))
         team_wins = {}
         for row in cur.fetchall():
             team_wins[row[0]] = int(row[1])
@@ -173,15 +186,15 @@ class ML_Ranking(object):
         return team_wins
 
     def calculate_ranking(self):
-        rating = dict(zip(self.teams, np.ones((len(self.teams)))))
+        rating = dict(zip(self._teams, np.ones((len(self._teams)))))
         new_rating = {}
-        wins = self.__get_wins()
+        wins = self._get_wins()
         ssq = 1
         max_iter = 100
         i = 0
         dummy_rating = 1.0
         while ssq > 1e-3 and i < max_iter:
-            for team in self.teams:
+            for team in self._teams:
                 denom = 0
                 for opp in self.team_games[team]:
                     denom += 1.0 / (rating[team] + rating[opp])
@@ -189,7 +202,7 @@ class ML_Ranking(object):
                 denom += 2.0 / (rating[team] + dummy_rating)
                 new_rating[team] = (wins[team] + 1) / denom
             ssq = 0.0
-            for team in self.teams:
+            for team in self._teams:
                 ssq += (rating[team] - new_rating[team]) ** 2
                 rating[team] = new_rating[team]
             i += 1
@@ -198,17 +211,17 @@ class ML_Ranking(object):
 
 class SRS(object):
     def __init__(self, year, week, db_path, db_games_table='games', db_standings_table='standings'):
-        self.year = year
-        self.week = week
+        self._year = year
+        self._week = week
         self.db_path = db_path
         self.db_games_table = db_games_table
         self.db_standings_table = db_standings_table
-        self.__load_data()
+        self._load_data()
 
-    def __load_data(self):
+    def _load_data(self):
         con = sqlite3.connect(self.db_path)
         cur = con.cursor()
-        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self.db_games_table, self.year, self.week))
+        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self.db_games_table, self._year, self._week))
         games = cur.fetchall()
         con.close()
         teams = []
@@ -217,9 +230,9 @@ class SRS(object):
                 teams.append(str(game[0]))
             if game[1] not in teams:
                 teams.append(str(game[1]))
-        self.teams = sorted(teams)
+        self._teams = sorted(teams)
         self.team_games = {}
-        for team in self.teams:
+        for team in self._teams:
             self.team_games[team] = []
             for game in games:
                 if str(game[0]) == team:
@@ -227,10 +240,10 @@ class SRS(object):
                 elif str(game[1]) == team:
                     self.team_games[team] += [str(game[0])]
 
-    def __get_margin_of_victory(self):
+    def _get_margin_of_victory(self):
         con = sqlite3.connect(self.db_path)
         cur = con.cursor()
-        cur.execute('select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self.year, self.week))
+        cur.execute('select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self._year, self._week))
         mov = {}
         n_games = {}
         for row in cur.fetchall():
@@ -240,10 +253,10 @@ class SRS(object):
         con.close()
         return mov, n_games
 
-    def __get_offense_averages(self):
+    def _get_offense_averages(self):
         con = sqlite3.connect(self.db_path)
         cur = con.cursor()
-        cur.execute('select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self.year, self.week))
+        cur.execute('select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self._year, self._week))
         points_for = {}
         points_against = {}
         n_games = {}
@@ -265,28 +278,28 @@ class SRS(object):
         ssq = 1.
         max_iter = 100
         if type == 'normal':
-            mov, n_games = self.__get_margin_of_victory()
+            mov, n_games = self._get_margin_of_victory()
             srs = mov.copy()
         elif type == 'offense':
-            mov, def_mov, n_games = self.__get_offense_averages()
+            mov, def_mov, n_games = self._get_offense_averages()
             srs = def_mov
         elif type == 'defense':
-            off_mov, mov, n_games = self.__get_offense_averages()
+            off_mov, mov, n_games = self._get_offense_averages()
             srs = off_mov
         new_srs = {}
         i = 0
         while ssq > 1e-3 and i <= max_iter:
             ssq = 0.0
-            for team in self.teams:
+            for team in self._teams:
                 new_srs[team] = mov[team] + sum(srs[opp] for opp in self.team_games[team]) / n_games[team]
-            for team in self.teams:
+            for team in self._teams:
                 ssq += (new_srs[team] - srs[team]) ** 2
                 srs[team] = new_srs[team]
             i += 1
         if i == max_iter:
             print 'Warning: Maximum number of iterations reached. Current sum squared error is %3.3e' % ssq
         sos = {}
-        for team in self.teams:
+        for team in self._teams:
             sos[team] = srs[team] - mov[team]
         return srs, mov, sos
             
