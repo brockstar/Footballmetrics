@@ -64,8 +64,19 @@ class OffenseEfficiency(object):
             return_data = data
         elif ret == 'np':
             return_data = Ypred
+        self.__data = data
         return return_data
 
+    def get_model_summary(self):
+        print self.__fit.summary()
+
+    def get_prediction_rsq(self):
+        PPG = self.__data['Pts'] / self.__data['G']
+        ss_tot = np.sum((PPG - PPG.mean()) ** 2)
+        ss_err = np.sum((PPG - self.__data['Prediction_Off']) ** 2)
+        r_sq = 1 - (ss_err / ss_tot)
+        print 'R-squared: %3.3f' % r_sq
+        return r_sq
 
 class DefenseEfficiency(object):
     def __init__(self, train_data_path=None):
