@@ -139,8 +139,8 @@ class FISB_Ranking(object):
         return x
 
     def _normalize(self, ratings):
-        rating_sum = np.sum(ratings.values()) / len(self._teams) 
-        ratings = {k: v - rating_sum for k, v in ratings.iteritems()}
+        rating_sum = np.sum(list(ratings.values())) / len(self._teams) 
+        ratings = {k: v - rating_sum for k, v in ratings.items()}
         return ratings
 
 
@@ -297,7 +297,7 @@ class SRS(object):
                 srs[team] = new_srs[team]
             i += 1
         if i == max_iter:
-            print 'Warning: Maximum number of iterations reached. Current sum squared error is %3.3e' % ssq
+            print('Warning: Maximum number of iterations reached. Current sum squared error is %3.3e' % ssq)
         sos = {}
         for team in self._teams:
             sos[team] = srs[team] - mov[team]
@@ -409,7 +409,7 @@ class CappedSRS(object):
                 srs[team] = new_srs[team]
             i += 1
         if i == max_iter:
-            print 'Warning: Maximum number of iterations reached. Current sum squared error is %3.3e' % ssq
+            print('Warning: Maximum number of iterations reached. Current sum squared error is %3.3e' % ssq)
         sos = {}
         for team in self.teams:
             sos[team] = srs[team] - mov[team]
