@@ -116,9 +116,9 @@ class FISB_Ranking(object):
         # rows = games
         # columns = teams + home field advantage
         matrix = np.zeros((len(self._games), len(self._teams)+1))
-        # To faster access index for every team create dict with indices for every team
+        # To faster access index of every team create dict with indices for every team
         idx = {k:i for i, k in enumerate(self._teams)}
-        for i in range(matrix.shape[0]):
+        for i in xrange(matrix.shape[0]):
             index_home = idx[self._games[i][0]]
             index_away = idx[self._games[i][1]]
             # game = home score - away score + home field advantage
