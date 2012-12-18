@@ -83,7 +83,7 @@ class FISB_Ranking(object):
     def _bootstrap_games(self, game_matrix, home_margins, iterations, nprocs=2):
         def worker(N, out_q):
             result = []
-            for i in xrange(N):
+            for i in range(N):
                 matrix, margins = self._randomize_matrix(game_matrix, home_margins)
                 res = self._decompose_matrix(matrix, margins)
                 result += [res]
@@ -91,13 +91,13 @@ class FISB_Ranking(object):
         out_q = mp.Queue()
         N = int(np.ceil(iterations / float(nprocs)))
         procs = []
-        for i in xrange(nprocs):
+        for i in range(nprocs):
             p = mp.Process(target=worker, args=(N, out_q, ))
             procs.append(p)
             p.start()
         results = []
-        for i in xrange(nprocs):
-            results += list(out_q.get())
+        for i in range(nprocs):
+            results.append(out_q.get())
         for p in procs:
             p.join()
         return results
