@@ -118,7 +118,6 @@ class DefenseEfficiency(object):
         '''
         data = pd.DataFrame(data)
         Xpred = self.__load_predictors(data)
-        params = self.__fit.params
         Ypred = self.__fit.predict(Xpred)
         if norm:
             Ypred -= Ypred.mean()
