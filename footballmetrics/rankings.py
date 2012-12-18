@@ -97,7 +97,7 @@ class FISB_Ranking(object):
             p.start()
         results = []
         for i in range(nprocs):
-            results.append(out_q.get())
+            results += list(out_q.get())
         for p in procs:
             p.join()
         return results
