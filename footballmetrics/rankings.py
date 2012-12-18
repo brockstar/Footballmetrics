@@ -139,8 +139,8 @@ class FISB_Ranking(object):
         return x
 
     def _normalize(self, ratings):
-        rating_sum = np.sum(ratings.values()) / len(self._teams) 
-        ratings = {k: v - rating_sum for k, v in ratings.iteritems()}
+        rating_sum = np.sum(list(ratings.values())) / len(self._teams) 
+        ratings = {k: v - rating_sum for k, v in ratings.items()}
         return ratings
 
 
@@ -297,9 +297,169 @@ class SRS(object):
                 srs[team] = new_srs[team]
             i += 1
         if i == max_iter:
-            print 'Warning: Maximum number of iterations reached. Current sum squared error is %3.3e' % ssq
+            print('Warning: Maximum number of iterations reached. Current sum squared error is %3.3e' % ssq)
         sos = {}
         for team in self._teams:
             sos[team] = srs[team] - mov[team]
         return srs, mov, sos
             
+
+class CappedSRS(object):
+    def __init__(self, year, week, db_path, db_games_table='games', db_standings_table='standings'):
+        self.year = year
+        self.week = week
+        self.db_path = db_path
+        self.db_games_table = db_games_table
+        self.db_standings_table = db_standings_table
+        self.__load_data()
+
+    def __load_data(self):
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self.db_games_table, self.year, self.week))
+        games = cur.fetchall()
+        con.close()
+        teams = []
+        for game in games:
+            if game[0] not in teams:
+                teams.append(str(game[0]))
+            if game[1] not in teams:
+                teams.append(str(game[1]))
+        self.teams = sorted(teams)
+        self.team_games = {}
+        for team in self.teams:
+            self.team_games[team] = []
+            for game in games:
+                if str(game[0]) == team:
+                    self.team_games[team] += [str(game[1])]
+                elif str(game[1]) == team:
+                    self.team_games[team] += [str(game[0])]
+
+    def __get_margin_of_victory(self, cap, weight):
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute('select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self.year, self.week))
+        n_games = {}
+        for row in cur.fetchall():
+            n_games[str(row[0])] = sum((int(row[1]), int(row[2]), int(row[3])))
+        if cap is not None:
+            capped = lambda x: np.sign(x) * cap if abs(x) > cap else x
+        else:
+            capped = lambda x: x
+        pts = {}
+        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore, Week from {} where year={} and week <= {}'.format('games', self.year, self.week))
+        weighted = lambda x: weight ** (self.week - x)
+        for row in cur.fetchall():
+            pt_spread = weighted(int(row[4])) * (int(row[2]) - int(row[3]))
+            if str(row[0]) in pts:
+                pts[str(row[0])] += capped(pt_spread)
+            else:
+                pts[str(row[0])] = capped(pt_spread)
+            if str(row[1]) in pts:
+                pts[str(row[1])] += -1.0 * capped(pt_spread)
+            else:
+                pts[str(row[1])] = -1.0 * capped(pt_spread)
+        mov = {}
+        for team in pts.keys():
+            mov[team] = pts[team] / n_games[team]
+        con.close()
+        return mov, n_games
+
+    def __get_offense_averages(self):
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute('select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self.year, self.week))
+        points_for = {}
+        points_against = {}
+        n_games = {}
+        for row in cur.fetchall():
+            n_games[str(row[0])] = sum((int(row[1]), int(row[2]), int(row[3])))
+            pf = int(row[4]) / n_games[str(row[0])]
+            points_for[str(row[0])] = pf
+            pa = int(row[5]) / n_games[str(row[0])]
+            points_against[str(row[0])] = pa
+        pf_avg = np.mean(points_for.values())
+        pa_avg = np.mean(points_against.values())
+        for team in points_for.keys():
+            points_for[team] -= pf_avg
+            points_against[team] -= pa_avg
+        con.close()
+        return points_for, points_against, n_games
+
+    def calculate_ranking(self, type='normal', cap=None, weight=1.0):
+        ssq = 1.
+        max_iter = 100
+        if type == 'normal':
+            mov, n_games = self.__get_margin_of_victory(cap, weight)
+            srs = mov.copy()
+        elif type == 'offense':
+            mov, def_mov, n_games = self.__get_offense_averages()
+            srs = def_mov
+        elif type == 'defense':
+            off_mov, mov, n_games = self.__get_offense_averages()
+            srs = off_mov
+        new_srs = {}
+        i = 0
+        while ssq > 1e-3 and i <= max_iter:
+            ssq = 0.0
+            for team in self.teams:
+                new_srs[team] = mov[team] + sum(srs[opp] for opp in self.team_games[team]) / n_games[team]
+            for team in self.teams:
+                ssq += (new_srs[team] - srs[team]) ** 2
+                srs[team] = new_srs[team]
+            i += 1
+        if i == max_iter:
+            print('Warning: Maximum number of iterations reached. Current sum squared error is %3.3e' % ssq)
+        sos = {}
+        for team in self.teams:
+            sos[team] = srs[team] - mov[team]
+        return srs, mov, sos
+
+    def optimize_cap(self, x0=None):
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week <= {}'.format('games', self.year, self.week))
+        self.games = []
+        scores = []
+        for row in cur.fetchall():
+            self.games.append([str(row[0]), str(row[1])])
+            scores.append(int(row[2]) - int(row[3]))
+        scores = np.array(scores)
+        err = lambda x: ((scores - self.__helper_cap(x)) ** 2).sum()
+        if x0 is None:
+            x0 = [21, 3]
+        err = lambda x: (self.__helper_cap(x) - scores)
+        xopt = scipy.optimize.leastsq(err, x0)
+        return xopt
+
+    def optimize_weight(self, x0=None):
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week <= {}'.format('games', self.year, self.week))
+        self.games = []
+        scores = []
+        for row in cur.fetchall():
+            self.games.append([str(row[0]), str(row[1])])
+            scores.append(int(row[2]) - int(row[3]))
+        scores = np.array(scores)
+        err = lambda x: ((scores - self.__helper_weight(x)) ** 2).sum()
+        if x0 is None:
+            x0 = [21, 3]
+        err = lambda x: (self.__helper_weight(x) - scores)
+        xopt = scipy.optimize.leastsq(err, x0)
+        return xopt
+
+    def __helper_cap(self, x):
+        srs = self.calculate_ranking(cap=x[0])[0]
+        srs_diff = []
+        for game in self.games:
+            srs_diff.append(srs[game[0]] - srs[game[1]] + x[1])
+        return np.array(srs_diff)
+
+    def __helper_weight(self, x):
+        srs = self.calculate_ranking(weight=x[0])[0]
+        srs_diff = []
+        for game in self.games:
+            srs_diff.append(srs[game[0]] - srs[game[1]] + x[1])
+        return np.array(srs_diff)
+                          
