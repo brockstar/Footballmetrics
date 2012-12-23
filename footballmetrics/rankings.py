@@ -5,6 +5,7 @@ import multiprocessing as mp
 import sqlite3
 
 import numpy as np
+import scipy.optimize
 # import some methods independently for faster decomposition
 from numpy import shape, dot
 from numpy.random import randint
@@ -20,6 +21,7 @@ class FISB_Ranking(object):
     There is also the possibility for a bootstrap of the results, so that
     the weight of potential outliers can be reduced.  
     '''
+    __slots__ = ['_year', '_week', '_games', '_teams', '_svd_filter']
     def __init__(self, year, week, db_path, db_table='games'):
         self._year = year
         self._week = week
@@ -53,7 +55,7 @@ class FISB_Ranking(object):
         else:
             raise IOError('Database not found.')
 
-    def calculate_ranking(self, bootstrapping=False, iterations=100, nprocs=2):
+    def calculate_ranking(self, bootstrap_iterations=None, nprocs=2):
         '''
         Calculates the ranking based on the data loaded in ``load_data``.
         It uses a singular value decomposition (SVD) to decompose 
@@ -64,21 +66,22 @@ class FISB_Ranking(object):
         '''
         home_margins = self._get_home_margins()
         game_matrix = self._get_game_matrix()
-        # _svd_filter is a simple function to take care of zero values in the sigma
-        # vector of the decomposition. It should be vectorized outside __decompose_matrix().
+        # _svd_filter is a simple function to invert the sigma vector of the decomposition.
+        # It should be vectorized outside _decompose_matrix() for faster access.
         self._svd_filter = np.vectorize(lambda x: 0 if x < 1e-10 else 1 / x)
-        if bootstrapping and iterations <= 0:
-            raise ValueError('Number of iterations needs to be positive integer number.')
-        if bootstrapping:
-            random_results = self._bootstrap_games(game_matrix, home_margins, 
-                    iterations, nprocs)
-            x = np.mean(random_results, axis=0)
+        if bootstrap_iterations is not None:
+            try:
+                random_results = self._bootstrap_games(game_matrix, home_margins, 
+                        bootstrap_iterations, nprocs)
+                x = np.mean(random_results, axis=0)
+            except TypeError:
+                raise TypeError('bootstrap_iterations and nprocs need to be integer numbers.')
         else:
             x = self._decompose_matrix(game_matrix, home_margins)
-        self.ratings = dict(zip(self._teams, x))
-        self.ratings = self._normalize(self.ratings)
-        self.ratings['Home field advantage'] = float(x[-1])
-        return self.ratings           
+        ratings = {team: rating for team, rating in zip(self._teams, x)}
+        ratings = self._normalize(ratings)
+        ratings['Home field advantage'] = x[-1]
+        return ratings           
 
     def _bootstrap_games(self, game_matrix, home_margins, iterations, nprocs=2):
         def worker(N, out_q):
@@ -89,7 +92,7 @@ class FISB_Ranking(object):
                 result += [res]
             out_q.put(result)
         out_q = mp.Queue()
-        N = int(np.ceil(iterations / float(nprocs)))
+        N = int(np.ceil(iterations / nprocs))
         procs = []
         for i in range(nprocs):
             p = mp.Process(target=worker, args=(N, out_q, ))
@@ -117,7 +120,7 @@ class FISB_Ranking(object):
         # columns = teams + home field advantage
         matrix = np.zeros((len(self._games), len(self._teams)+1))
         # To faster access index of every team create dict with indices for every team
-        idx = {k:i for i, k in enumerate(self._teams)}
+        idx = {k: i for i, k in enumerate(self._teams)}
         for i in xrange(matrix.shape[0]):
             index_home = idx[self._games[i][0]]
             index_away = idx[self._games[i][1]]
@@ -148,15 +151,19 @@ class ML_Ranking(object):
     def __init__(self, year, week, db_path, db_games_table='games', db_standings_table='standings'):
         self._year = year
         self._week = week
-        self.db_path = db_path
-        self.db_games_table = db_games_table
-        self.db_standings_table = db_standings_table
+        self._db_path = db_path
+        self._db_games_table = db_games_table
+        self._db_standings_table = db_standings_table
         self._load_data()
 
     def _load_data(self):
-        con = sqlite3.connect(self.db_path)
+        con = sqlite3.connect(self._db_path)
         cur = con.cursor()
-        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self.db_games_table, self._year, self._week))
+        if self._year is None:
+            cmd = 'select HomeTeam, AwayTeam, HomeScore, AwayScore from {}'.format(self._db_games_table)
+        else: 
+            cmd = 'select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self._db_games_table, self._year, self._week)
+        cur.execute(cmd)
         games = cur.fetchall()
         con.close()
         teams = []
@@ -166,45 +173,42 @@ class ML_Ranking(object):
             if game[1] not in teams:
                 teams.append(str(game[1]))
         self._teams = sorted(teams)
-        self.team_games = {}
+        self._team_games = {}
         for team in self._teams:
-            self.team_games[team] = []
+            self._team_games[team] = []
             for game in games:
                 if str(game[0]) == team:
-                    self.team_games[team] += [str(game[1])]
+                    self._team_games[team] += [str(game[1])]
                 elif str(game[1]) == team:
-                    self.team_games[team] += [str(game[0])]
+                    self._team_games[team] += [str(game[0])]
 
     def _get_wins(self):
-        con = sqlite3.connect(self.db_path)
-        cur = con.cursor()
-        cur.execute('select team, win from {} where year={} and week={}'.format(self.db_standings_table, self._year, self._week))
-        team_wins = {}
-        for row in cur.fetchall():
-            team_wins[row[0]] = int(row[1])
-        con.close()
+        con = sqlite3.connect(self._db_path)
+        with con:
+            cur = con.cursor()
+            if self._year is None:
+                cmd = 'select team, win from {}'.format(self._db_standings_table)
+            else:
+                cmd = 'select team, win from {} where year={} and week={}'.format(self._db_standings_table, self._year, self._week)
+            team_wins = {row[0]: int(row[1]) for row in cur.execute(cmd)}
         return team_wins
 
-    def calculate_ranking(self):
-        rating = dict(zip(self._teams, np.ones((len(self._teams)))))
-        new_rating = {}
+    def calculate_ranking(self, max_iter=100):
+        rating = {team: a for team, a in zip(self._teams, np.ones((len(self._teams))))}
+        new_rating = rating.copy() 
         wins = self._get_wins()
-        ssq = 1
-        max_iter = 100
-        i = 0
         dummy_rating = 1.0
+        ssq = 1.0
+        i = 0
+        team_games = self._team_games
         while ssq > 1e-3 and i < max_iter:
             for team in self._teams:
-                denom = 0
-                for opp in self.team_games[team]:
-                    denom += 1.0 / (rating[team] + rating[opp])
+                denom = sum(1.0 / (rating[team] + rating[opp]) for opp in team_games[team])
                 # dummy win and loss!!!
                 denom += 2.0 / (rating[team] + dummy_rating)
                 new_rating[team] = (wins[team] + 1) / denom
-            ssq = 0.0
-            for team in self._teams:
-                ssq += (rating[team] - new_rating[team]) ** 2
-                rating[team] = new_rating[team]
+            ssq = sum((rating[team] - new_rating[team]) ** 2 for team in rating)
+            rating = new_rating.copy() 
             i += 1
         return rating
 
@@ -221,7 +225,11 @@ class SRS(object):
     def _load_data(self):
         con = sqlite3.connect(self.db_path)
         cur = con.cursor()
-        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self.db_games_table, self._year, self._week))
+        if self._year is None:
+            cmd = 'select HomeTeam, AwayTeam, HomeScore, AwayScore from {}'.format(self.db_games_table)
+        else:
+            cmd = 'select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self.db_games_table, self._year, self._week)
+        cur.execute(cmd)
         games = cur.fetchall()
         con.close()
         teams = []
@@ -243,7 +251,11 @@ class SRS(object):
     def _get_margin_of_victory(self):
         con = sqlite3.connect(self.db_path)
         cur = con.cursor()
-        cur.execute('select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self._year, self._week))
+        if self._year is None:
+            cmd = 'select team, win, loss, tie, pointsfor, pointsagainst from {}'.format(self.db_standings_table)
+        else:
+            cmd = 'select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self._year, self._week)
+        cur.execute(cmd)
         mov = {}
         n_games = {}
         for row in cur.fetchall():
@@ -256,7 +268,11 @@ class SRS(object):
     def _get_offense_averages(self):
         con = sqlite3.connect(self.db_path)
         cur = con.cursor()
-        cur.execute('select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self._year, self._week))
+        if self._year is None:
+            cmd = 'select team, win, loss, tie, pointsfor, pointsagainst from {}'.format(self.db_standings_table)
+        else:
+            cmd = 'select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self._year, self._week)
+        cur.execute(cmd)
         points_for = {}
         points_against = {}
         n_games = {}
@@ -274,192 +290,29 @@ class SRS(object):
         con.close()
         return points_for, points_against, n_games
 
-    def calculate_ranking(self, type='normal'):
+    def calculate_ranking(self, method='normal', max_iter=100):
         ssq = 1.
-        max_iter = 100
-        if type == 'normal':
+        if method == 'normal':
             mov, n_games = self._get_margin_of_victory()
             srs = mov.copy()
-        elif type == 'offense':
+        elif method == 'offense':
             mov, def_mov, n_games = self._get_offense_averages()
             srs = def_mov
-        elif type == 'defense':
+        elif method == 'defense':
             off_mov, mov, n_games = self._get_offense_averages()
             srs = off_mov
+        else:
+            raise ValueError('Unknown method "{}".'.format(method))
         new_srs = {}
         i = 0
+        calc_rating = lambda team: mov[team] + sum(srs[opp] for opp in self.team_games[team]) / n_games[team]
         while ssq > 1e-3 and i <= max_iter:
-            ssq = 0.0
-            for team in self._teams:
-                new_srs[team] = mov[team] + sum(srs[opp] for opp in self.team_games[team]) / n_games[team]
-            for team in self._teams:
-                ssq += (new_srs[team] - srs[team]) ** 2
-                srs[team] = new_srs[team]
+            new_srs = {team: calc_rating(team) for team in self._teams}
+            ssq = sum((new_srs[team] - srs[team]) ** 2 for team in srs)
+            srs = new_srs.copy()
             i += 1
         if i == max_iter:
-            print('Warning: Maximum number of iterations reached. Current sum squared error is %3.3e' % ssq)
-        sos = {}
-        for team in self._teams:
-            sos[team] = srs[team] - mov[team]
+            print('Warning: Maximum number of iterations reached. Current sum squared error is {%3.3e}'.format(ssq))
+        sos = {team: srs[team] - mov[team] for team in srs}
         return srs, mov, sos
             
-
-class CappedSRS(object):
-    def __init__(self, year, week, db_path, db_games_table='games', db_standings_table='standings'):
-        self.year = year
-        self.week = week
-        self.db_path = db_path
-        self.db_games_table = db_games_table
-        self.db_standings_table = db_standings_table
-        self.__load_data()
-
-    def __load_data(self):
-        con = sqlite3.connect(self.db_path)
-        cur = con.cursor()
-        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self.db_games_table, self.year, self.week))
-        games = cur.fetchall()
-        con.close()
-        teams = []
-        for game in games:
-            if game[0] not in teams:
-                teams.append(str(game[0]))
-            if game[1] not in teams:
-                teams.append(str(game[1]))
-        self.teams = sorted(teams)
-        self.team_games = {}
-        for team in self.teams:
-            self.team_games[team] = []
-            for game in games:
-                if str(game[0]) == team:
-                    self.team_games[team] += [str(game[1])]
-                elif str(game[1]) == team:
-                    self.team_games[team] += [str(game[0])]
-
-    def __get_margin_of_victory(self, cap, weight):
-        con = sqlite3.connect(self.db_path)
-        cur = con.cursor()
-        cur.execute('select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self.year, self.week))
-        n_games = {}
-        for row in cur.fetchall():
-            n_games[str(row[0])] = sum((int(row[1]), int(row[2]), int(row[3])))
-        if cap is not None:
-            capped = lambda x: np.sign(x) * cap if abs(x) > cap else x
-        else:
-            capped = lambda x: x
-        pts = {}
-        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore, Week from {} where year={} and week <= {}'.format('games', self.year, self.week))
-        weighted = lambda x: weight ** (self.week - x)
-        for row in cur.fetchall():
-            pt_spread = weighted(int(row[4])) * (int(row[2]) - int(row[3]))
-            if str(row[0]) in pts:
-                pts[str(row[0])] += capped(pt_spread)
-            else:
-                pts[str(row[0])] = capped(pt_spread)
-            if str(row[1]) in pts:
-                pts[str(row[1])] += -1.0 * capped(pt_spread)
-            else:
-                pts[str(row[1])] = -1.0 * capped(pt_spread)
-        mov = {}
-        for team in pts.keys():
-            mov[team] = pts[team] / n_games[team]
-        con.close()
-        return mov, n_games
-
-    def __get_offense_averages(self):
-        con = sqlite3.connect(self.db_path)
-        cur = con.cursor()
-        cur.execute('select team, win, loss, tie, pointsfor, pointsagainst from {} where year={} and week={}'.format(self.db_standings_table, self.year, self.week))
-        points_for = {}
-        points_against = {}
-        n_games = {}
-        for row in cur.fetchall():
-            n_games[str(row[0])] = sum((int(row[1]), int(row[2]), int(row[3])))
-            pf = int(row[4]) / n_games[str(row[0])]
-            points_for[str(row[0])] = pf
-            pa = int(row[5]) / n_games[str(row[0])]
-            points_against[str(row[0])] = pa
-        pf_avg = np.mean(points_for.values())
-        pa_avg = np.mean(points_against.values())
-        for team in points_for.keys():
-            points_for[team] -= pf_avg
-            points_against[team] -= pa_avg
-        con.close()
-        return points_for, points_against, n_games
-
-    def calculate_ranking(self, type='normal', cap=None, weight=1.0):
-        ssq = 1.
-        max_iter = 100
-        if type == 'normal':
-            mov, n_games = self.__get_margin_of_victory(cap, weight)
-            srs = mov.copy()
-        elif type == 'offense':
-            mov, def_mov, n_games = self.__get_offense_averages()
-            srs = def_mov
-        elif type == 'defense':
-            off_mov, mov, n_games = self.__get_offense_averages()
-            srs = off_mov
-        new_srs = {}
-        i = 0
-        while ssq > 1e-3 and i <= max_iter:
-            ssq = 0.0
-            for team in self.teams:
-                new_srs[team] = mov[team] + sum(srs[opp] for opp in self.team_games[team]) / n_games[team]
-            for team in self.teams:
-                ssq += (new_srs[team] - srs[team]) ** 2
-                srs[team] = new_srs[team]
-            i += 1
-        if i == max_iter:
-            print('Warning: Maximum number of iterations reached. Current sum squared error is %3.3e' % ssq)
-        sos = {}
-        for team in self.teams:
-            sos[team] = srs[team] - mov[team]
-        return srs, mov, sos
-
-    def optimize_cap(self, x0=None):
-        con = sqlite3.connect(self.db_path)
-        cur = con.cursor()
-        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week <= {}'.format('games', self.year, self.week))
-        self.games = []
-        scores = []
-        for row in cur.fetchall():
-            self.games.append([str(row[0]), str(row[1])])
-            scores.append(int(row[2]) - int(row[3]))
-        scores = np.array(scores)
-        err = lambda x: ((scores - self.__helper_cap(x)) ** 2).sum()
-        if x0 is None:
-            x0 = [21, 3]
-        err = lambda x: (self.__helper_cap(x) - scores)
-        xopt = scipy.optimize.leastsq(err, x0)
-        return xopt
-
-    def optimize_weight(self, x0=None):
-        con = sqlite3.connect(self.db_path)
-        cur = con.cursor()
-        cur.execute('select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week <= {}'.format('games', self.year, self.week))
-        self.games = []
-        scores = []
-        for row in cur.fetchall():
-            self.games.append([str(row[0]), str(row[1])])
-            scores.append(int(row[2]) - int(row[3]))
-        scores = np.array(scores)
-        err = lambda x: ((scores - self.__helper_weight(x)) ** 2).sum()
-        if x0 is None:
-            x0 = [21, 3]
-        err = lambda x: (self.__helper_weight(x) - scores)
-        xopt = scipy.optimize.leastsq(err, x0)
-        return xopt
-
-    def __helper_cap(self, x):
-        srs = self.calculate_ranking(cap=x[0])[0]
-        srs_diff = []
-        for game in self.games:
-            srs_diff.append(srs[game[0]] - srs[game[1]] + x[1])
-        return np.array(srs_diff)
-
-    def __helper_weight(self, x):
-        srs = self.calculate_ranking(weight=x[0])[0]
-        srs_diff = []
-        for game in self.games:
-            srs_diff.append(srs[game[0]] - srs[game[1]] + x[1])
-        return np.array(srs_diff)
-                          
