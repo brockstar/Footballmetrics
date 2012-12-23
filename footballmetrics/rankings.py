@@ -5,7 +5,6 @@ import multiprocessing as mp
 import sqlite3
 
 import numpy as np
-import scipy.optimize
 # import some methods independently for faster decomposition
 from numpy import shape, dot
 from numpy.random import randint
