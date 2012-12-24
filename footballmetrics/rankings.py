@@ -214,7 +214,7 @@ class ML_Ranking(object):
         while ssq > 1e-3 and i < max_iter:
             for team in self._teams:
                 denom = sum(1.0 / (rating[team] + rating[opp]) for opp in team_games[team])
-                # dummy win and loss!!!
+                # dummy win and loss
                 denom += 2.0 / (rating[team] + dummy_rating)
                 new_rating[team] = (wins[team] + 1) / denom
             ssq = sum((rating[team] - new_rating[team]) ** 2 for team in rating)

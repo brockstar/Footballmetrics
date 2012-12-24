@@ -52,9 +52,9 @@ class TestDataHandler(unittest.TestCase):
     def test_get_teams(self):
         self.assertEqual(self.dh.get_teams(), ['A', 'B', 'C', 'D'])
 
-    def test_get_margins(self):
+    def test_get_game_spreads(self):
         margins = self.games['HomeScore'] - self.games['AwayScore']
-        series = self.dh.get_margins() == margins
+        series = self.dh.get_game_spreads() == margins
         self.assert_(list(series.unique()) == [True])
 
     def test_get_wins(self):
@@ -66,7 +66,7 @@ class TestDataHandler(unittest.TestCase):
         dh = fm_dl.DataHandler()
         self.assertRaises(AttributeError, dh.get_wins)
         self.assertRaises(AttributeError, dh.get_teams)
-        self.assertRaises(AttributeError, dh.get_margins)
+        self.assertRaises(AttributeError, dh.get_game_spreads)
 
 
 if __name__ == '__main__':

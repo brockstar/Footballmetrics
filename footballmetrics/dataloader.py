@@ -58,25 +58,51 @@ class DataHandler(object):
             raise ValueError('Found differences in available teams.')
 
     def get_teams(self):
-        '''Returns all teams from standings Data Frame.'''
-        try:
-            teams = sorted(self._standings_df.index)
-        except AttributeError:
-            raise AttributeError('Standings Data Frame not set. Use set_standings_df().')
+        '''Returns all (unique) teams from Standings Data Frame.'''
+        teams = sorted(self._standings_df.index)
         return teams
 
-    def get_margins(self):
-        '''Returns the margin of victory of every game in the game Data Frame.'''
-        try:
-            margins = self._games_df['HomeScore'] - self._games_df['AwayScore']
-        except AttributeError:
-            raise AttributeError('Games Data Frame not set. Use set_games_df().')
-        return margins
-
     def get_wins(self):
-        '''Returns the number of wins for each team.'''
-        try:
-            wins = self._standings_df['Win']
-        except AttributeError:
-            raise AttributeError('Standings Data Frame not set. Use set_standings_df().')
+        '''Returns the number of wins for each team from Standings Data Frame.'''
+        wins = self._standings_df['Win']
         return wins
+    
+    def get_game_spreads(self, add_to_df=False):
+        '''
+        Returns the point spread of every game in the Game Data Frame.
+        If *add_to_df* is True, the result will be inserted into the Game DF.
+        '''
+        pt_spreads = self._games_df['HomeScore'] - self._games_df['AwayScore']
+        if add_to_df:
+            self._games_df['PointSpreads'] = pt_spreads
+        return pt_spreads
+
+    def get_mov(self, add_to_df=False):
+        '''
+        Returns the margin of victory for every team in the Standings Data Frame.
+        MoV = (PF - PA) / (# of games).
+        If *add_to_df* is True, the result will be inserted into the Standings DF.
+        '''
+        pt_diff = self._standings_df['PointsFor'] - self._standings_df['PointsAgainst']
+        # MoV = Point Differential / (# of games)
+        mov = pt_diff / (self._standings_df[['Win', 'Loss', 'Tie']].sum(axis=1))
+        if add_to_df:
+            self._standings_df['MoV'] = mov
+        return mov
+
+    def get_scoring_over_avg(self, key='offense'):
+        '''
+        Returns the scoring of a team's offense/defense over average.
+        Sc_off = (PF / (# of games)) - Avg(PF / (# of games))
+        *key* controls, whether scoring for offense or defense is calculated.
+        key = {'offense', 'defense'}
+        '''
+        n_games = self._standings_df[['Win', 'Loss', 'Tie']].sum(axis=1)
+        if key == 'offense':
+            score = self._standings_df['PointsFor'] / n_games
+        elif key == 'defense':
+            score = self._standings_df['PointsAgainst'] / n_games
+        else:
+            raise ValueError("key must be in ['offense', 'defense'].")
+        score -= score.mean()
+        return score
