@@ -62,6 +62,12 @@ class TestDataHandler(unittest.TestCase):
         series = wins == self.dh.get_wins()
         self.assertEqual(list(series.unique()), [True])
 
+    def test_no_df_set(self):
+        dh = fm_dl.DataHandler()
+        self.assertRaises(AttributeError, dh.get_wins)
+        self.assertRaises(AttributeError, dh.get_teams)
+        self.assertRaises(AttributeError, dh.get_margins)
+
 
 if __name__ == '__main__':
     unittest.main()

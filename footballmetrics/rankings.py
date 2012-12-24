@@ -15,8 +15,7 @@ class FISB_Ranking(object):
     '''
     This class calculates a ranking similar to Sagarin's. It uses all
     games played in the season given by *year* and the given *week* 
-    to determine a rating for every team 
-    and an additional home field advantage.
+    to determine a rating for every team and an additional home field advantage.
     There is also the possibility for a bootstrap of the results, so that
     the weight of potential outliers can be reduced.  
     '''
@@ -60,8 +59,9 @@ class FISB_Ranking(object):
         It uses a singular value decomposition (SVD) to decompose 
         the game matrix. It returns the ratings for each team and the 
         home field advantage.
-        If *bootstrapping* = True, the game matrix will be randomized as often
-        as given in iteration.
+        If *bootstrap_iterations* is set to an integer number, the game matrix will be 
+        randomized as often as given in iteration. *nprocs* determines the number of 
+        CPU cores used for computation.
         '''
         home_margins = self._get_home_margins()
         game_matrix = self._get_game_matrix()
@@ -148,6 +148,13 @@ class FISB_Ranking(object):
 
 class ML_Ranking(object):
     def __init__(self, year, week, db_path, db_games_table='games', db_standings_table='standings'):
+        '''
+        This class produces Maximum-Likelihood rankings solely based on wins and losses.
+        A dummy team is introduced, to assure finite ratings for unbeaten teams. It is easy to
+        calculate a win probability with this model, since the probability for a victory of team A
+        is: W(A) = R(A) / (R(A) + R(B)).
+        The ratings will be calculated for all games played in season *year* up to week *week*.
+        '''
         self._year = year
         self._week = week
         self._db_path = db_path
@@ -193,6 +200,10 @@ class ML_Ranking(object):
         return team_wins
 
     def calculate_ranking(self, max_iter=100):
+        '''
+        Calculates the ranking. *max_iter* defines the maximal number of iterations before aborting.
+        The other criterion for convergence is a sum-squared error of less than 1e-3.
+        '''
         rating = {team: a for team, a in zip(self._teams, np.ones((len(self._teams))))}
         new_rating = rating.copy() 
         wins = self._get_wins()
@@ -209,11 +220,19 @@ class ML_Ranking(object):
             ssq = sum((rating[team] - new_rating[team]) ** 2 for team in rating)
             rating = new_rating.copy() 
             i += 1
+        if i == max_iter:
+            print('Warning: Maximum number of iterations reached. Current sum squared error is {%3.3e}'.format(ssq))
         return rating
 
 
 class SRS(object):
     def __init__(self, year, week, db_path, db_games_table='games', db_standings_table='standings'):
+        '''
+        This class is capable of computing the Simple Rating System (SRS) for all teams
+        in a given league. The SRS is simply the margin of victory (MoV) corrected by an value
+        identified as strength of schedule (SOS). Hence, SRS = MoV + SOS.
+        The ratings will be calculated for all games played in season *year* up to week *week*.
+        '''
         self._year = year
         self._week = week
         self.db_path = db_path
@@ -290,6 +309,13 @@ class SRS(object):
         return points_for, points_against, n_games
 
     def calculate_ranking(self, method='normal', max_iter=100):
+        '''
+        This method calculates the rankings.
+        The parameter *method* defines if the ordinary SRS or OSRS/DSRS is calculated.
+        method = {'normal', 'offense', 'defense'}
+        *max_iter* determines the maximal number of iterations before aborting. The other
+        criterion of convergence is a sum-squared error of less than 1e-3.
+        '''
         ssq = 1.
         if method == 'normal':
             mov, n_games = self._get_margin_of_victory()
