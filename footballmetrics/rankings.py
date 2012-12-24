@@ -10,6 +10,8 @@ from numpy import shape, dot
 from numpy.random import randint
 from scipy.linalg import svd, diagsvd
 
+import footballmetrics.dataloader as fm_dl
+
 
 class FISB_Ranking(object):
     '''
@@ -19,40 +21,10 @@ class FISB_Ranking(object):
     There is also the possibility for a bootstrap of the results, so that
     the weight of potential outliers can be reduced.  
     '''
-    __slots__ = ['_year', '_week', '_games', '_teams', '_svd_filter']
-    def __init__(self, year, week, db_path, db_table='games'):
-        self._year = year
-        self._week = week
-        self._load_data(db_path, db_table)
+    def __init__(self, games_df):
+        self._dh = fm_dl.DataHandler(games_df=games_df)
+        self._teams = self._dh.get_teams()
                 
-    def _load_data(self, db_path, db_table):
-        ''' Loads the data from a SQLite database at location *db_path*.'''
-        if os.path.isfile(db_path):
-            con = sqlite3.connect(db_path)
-            with con:
-                cur = con.cursor()
-                if self._year is not None and self._week is not None:
-                    cmd = '''select HomeTeam, AwayTeam, HomeScore, AwayScore
-                             from %s where Year=%d and Week<=%d''' % \
-                             (db_table, self._year, self._week)
-                elif self._year is not None and self._week is None:
-                    cmd = '''select HomeTeam, AwayTeam, HomeScore, AwayScore
-                             from %s where Year=%d''' % (db_table, self._year)
-                else:
-                    cmd = '''select HomeTeam, AwayTeam, HomeScore, AwayScore
-                           from %s''' % (db_table)
-                cur.execute(cmd)
-                self._games = cur.fetchall()
-            teams = []
-            for game in self._games:
-                if game[0] not in teams:
-                    teams.append(str(game[0]))
-                if game[1] not in teams:
-                    teams.append(str(game[1]))
-            self._teams = sorted(teams)
-        else:
-            raise IOError('Database not found.')
-
     def calculate_ranking(self, bootstrap_iterations=None, nprocs=2):
         '''
         Calculates the ranking based on the data loaded in ``load_data``.
@@ -63,7 +35,7 @@ class FISB_Ranking(object):
         randomized as often as given in iteration. *nprocs* determines the number of 
         CPU cores used for computation.
         '''
-        home_margins = self._get_home_margins()
+        home_margins = self._dh.get_game_spreads()
         game_matrix = self._get_game_matrix()
         # _svd_filter is a simple function to invert the sigma vector of the decomposition.
         # It should be vectorized outside _decompose_matrix() for faster access.
@@ -110,19 +82,16 @@ class FISB_Ranking(object):
         random_margins = home_margins[rand_idx]
         return random_matrix, random_margins
     
-    def _get_home_margins(self):
-        home_margins = np.array([float(x[-2]) - float(x[-1]) for x in self._games])
-        return home_margins
-
     def _get_game_matrix(self):
         # rows = games
         # columns = teams + home field advantage
+        self._games = self._dh.get_games()
         matrix = np.zeros((len(self._games), len(self._teams)+1))
         # To faster access index of every team create dict with indices for every team
         idx = {k: i for i, k in enumerate(self._teams)}
-        for i in xrange(matrix.shape[0]):
-            index_home = idx[self._games[i][0]]
-            index_away = idx[self._games[i][1]]
+        for i in range(len(self._games)):
+            index_home = idx[self._games.ix[i]['HomeTeam']]
+            index_away = idx[self._games.ix[i]['AwayTeam']]
             # game = home score - away score + home field advantage
             matrix[i, index_home] = 1
             matrix[i, index_away] = -1

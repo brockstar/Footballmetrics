@@ -40,14 +40,24 @@ class DataLoader(object):
 
 class DataHandler(object):
     def __init__(self, games_df=None, standings_df=None):
-        if games_df is not None:
+        if type(games_df) == pd.core.frame.DataFrame:
             self._games_df = games_df
-        if standings_df is not None:
+        elif games_df is None:
+            self._games_df = None
+        else:
+            raise TypeError('games_df not None or pandas DataFrame.')
+        if type(standings_df) == pd.core.frame.DataFrame:
             self._standings_df = standings_df
             if self._standings_df.index.name != 'Team':
                 self._standings_df.set_index('Team', inplace=True)
-        if games_df is not None and standings_df is not None:
+        elif standings_df is None:
+            self._standings_df = None
+        else:
+            raise TypeError('standings_df not None or pandas DataFrame.')
+        if self._games_df is not None and self._standings_df is not None:
+            # Needs to be implemented!
             self._check_integrity()
+            #pass
 
     def _check_integrity(self):
         '''Checks integrity of the two provided Data Frames.'''
@@ -58,15 +68,26 @@ class DataHandler(object):
             raise ValueError('Found differences in available teams.')
 
     def get_teams(self):
-        '''Returns all (unique) teams from Standings Data Frame.'''
-        teams = sorted(self._standings_df.index)
+        '''Returns all (unique) teams.'''
+        if self._standings_df is not None:
+            teams = sorted(self._standings_df.index)
+        else:
+            teams = sorted(set(self._games_df['HomeTeam']) | set(self._games_df['AwayTeam']))
         return teams
 
     def get_wins(self):
         '''Returns the number of wins for each team from Standings Data Frame.'''
         wins = self._standings_df['Win']
         return wins
+
+    def get_number_of_games(self):
+        '''Return number of games in Games Data Frame.'''
+        return len(self._games_df)
     
+    def get_games(self):
+        '''Returns the Games Data Frame.'''
+        return self._games_df
+
     def get_game_spreads(self, add_to_df=False):
         '''
         Returns the point spread of every game in the Game Data Frame.
