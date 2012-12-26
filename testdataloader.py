@@ -49,6 +49,12 @@ class TestDataHandler(unittest.TestCase):
         self.standings = dl.load_sqlite('test.db', 'select * from standings', index='Team')
         self.dh = fm_dl.DataHandler(self.games, self.standings)
    
+    def test_no_df_set(self):
+        dh = fm_dl.DataHandler()
+        self.assertRaises(TypeError, dh.get_wins)
+        self.assertRaises(TypeError, dh.get_teams)
+        self.assertRaises(TypeError, dh.get_game_spreads)
+   
     def test_get_teams(self):
         self.assertEqual(self.dh.get_teams(), ['A', 'B', 'C', 'D'])
 
@@ -61,12 +67,6 @@ class TestDataHandler(unittest.TestCase):
         wins = self.standings['Win']
         series = wins == self.dh.get_wins()
         self.assertEqual(list(series.unique()), [True])
-
-    def test_no_df_set(self):
-        dh = fm_dl.DataHandler()
-        self.assertRaises(TypeError, dh.get_wins)
-        self.assertRaises(TypeError, dh.get_teams)
-        self.assertRaises(TypeError, dh.get_game_spreads)
 
 
 if __name__ == '__main__':

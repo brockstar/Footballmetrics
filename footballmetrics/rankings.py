@@ -127,53 +127,7 @@ class ML_Ranking(object):
         '''
         self._dh = fm_dl.DataHandler(games_df=games_df, standings_df=standings_df)
         self._teams = self._dh.get_teams()
-        self._opponents = self._get_opponents()
-
-    def _get_opponents(self):
-        games = self._dh.get_games()
-        def get_opp(team):
-            opp = list(games[games['HomeTeam'] == team]['AwayTeam'])
-            opp += list(games[games['AwayTeam'] == team]['HomeTeam'])
-            return opp
-        opponents = pd.DataFrame({team: get_opp(team) for team in self._teams})
-        return opponents
-
-    def _load_data(self):
-        con = sqlite3.connect(self._db_path)
-        cur = con.cursor()
-        if self._year is None:
-            cmd = 'select HomeTeam, AwayTeam, HomeScore, AwayScore from {}'.format(self._db_games_table)
-        else: 
-            cmd = 'select HomeTeam, AwayTeam, HomeScore, AwayScore from {} where year={} and week<={}'.format(self._db_games_table, self._year, self._week)
-        cur.execute(cmd)
-        games = cur.fetchall()
-        con.close()
-        teams = []
-        for game in games:
-            if game[0] not in teams:
-                teams.append(str(game[0]))
-            if game[1] not in teams:
-                teams.append(str(game[1]))
-        self._teams = sorted(teams)
-        self._team_games = {}
-        for team in self._teams:
-            self._team_games[team] = []
-            for game in games:
-                if str(game[0]) == team:
-                    self._team_games[team] += [str(game[1])]
-                elif str(game[1]) == team:
-                    self._team_games[team] += [str(game[0])]
-
-    def _get_wins(self):
-        con = sqlite3.connect(self._db_path)
-        with con:
-            cur = con.cursor()
-            if self._year is None:
-                cmd = 'select team, win from {}'.format(self._db_standings_table)
-            else:
-                cmd = 'select team, win from {} where year={} and week={}'.format(self._db_standings_table, self._year, self._week)
-            team_wins = {row[0]: int(row[1]) for row in cur.execute(cmd)}
-        return team_wins
+        self._opponents = self._dh.get_opponents()
 
     def calculate_ranking(self, max_iter=100):
         '''
@@ -210,16 +164,7 @@ class SRS(object):
         '''
         self._dh = fm_dl.DataHandler(games_df=games_df, standings_df=standings_df)
         self._teams = self._dh.get_teams()
-        self._opponents = self._get_opponents()
-
-    def _get_opponents(self):
-        games = self._dh.get_games()
-        def get_opp(team):
-            opp = list(games[games['HomeTeam'] == team]['AwayTeam'])
-            opp += list(games[games['AwayTeam'] == team]['HomeTeam'])
-            return opp
-        opponents = pd.DataFrame({team: get_opp(team) for team in self._teams})
-        return opponents
+        self._opponents = self._dh.get_opponents()
 
     def calculate_ranking(self, method='normal', max_iter=100):
         '''
@@ -235,9 +180,11 @@ class SRS(object):
             mov = dict(self._dh.get_mov())
             srs = mov.copy()
         elif method == 'offense':
+            # OSRS = Off_MoV + Def_SOS
             mov = dict(self._dh.get_scoring_over_avg(key='offense'))
             srs = dict(self._dh.get_scoring_over_avg(key='defense'))
         elif method == 'defense':
+            # DSRS = Def_MoV + Off_SOS
             mov = dict(self._dh.get_scoring_over_avg(key='defense'))
             srs = dict(self._dh.get_scoring_over_avg(key='offense'))
         else:

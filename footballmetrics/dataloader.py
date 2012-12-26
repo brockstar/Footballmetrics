@@ -75,6 +75,16 @@ class DataHandler(object):
             teams = sorted(set(self._games_df['HomeTeam']) | set(self._games_df['AwayTeam']))
         return teams
 
+    def get_opponents(self):
+        '''Returns opponents of all teams in Games Data Frame.'''
+        games = self.get_games()
+        def get_opp(team):
+            opp = list(games[games['HomeTeam'] == team]['AwayTeam'])
+            opp += list(games[games['AwayTeam'] == team]['HomeTeam'])
+            return opp
+        opponents = pd.DataFrame({team: get_opp(team) for team in self.get_teams()})
+        return opponents       
+
     def get_wins(self):
         '''Returns the number of wins for each team from Standings Data Frame.'''
         wins = self._standings_df['Win']
