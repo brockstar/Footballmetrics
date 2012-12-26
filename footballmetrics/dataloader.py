@@ -81,9 +81,10 @@ class DataHandler(object):
         return wins
 
     def get_number_of_games(self):
-        '''Return number of games in Games Data Frame.'''
-        return len(self._games_df)
-    
+        '''Return number of games for each team in Standings Data Frame.'''
+        n_games = self._standings_df[['Win', 'Loss', 'Tie']].sum(axis=1)
+        return n_games
+
     def get_games(self):
         '''Returns the Games Data Frame.'''
         return self._games_df
@@ -106,10 +107,11 @@ class DataHandler(object):
         '''
         pt_diff = self._standings_df['PointsFor'] - self._standings_df['PointsAgainst']
         # MoV = Point Differential / (# of games)
-        mov = pt_diff / (self._standings_df[['Win', 'Loss', 'Tie']].sum(axis=1))
+        mov = pt_diff / self.get_number_of_games()
         if add_to_df:
             self._standings_df['MoV'] = mov
         return mov
+
 
     def get_scoring_over_avg(self, key='offense'):
         '''
@@ -118,7 +120,7 @@ class DataHandler(object):
         *key* controls, whether scoring for offense or defense is calculated.
         key = {'offense', 'defense'}
         '''
-        n_games = self._standings_df[['Win', 'Loss', 'Tie']].sum(axis=1)
+        n_games = self.get_number_of_games()
         if key == 'offense':
             score = self._standings_df['PointsFor'] / n_games
         elif key == 'defense':

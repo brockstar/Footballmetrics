@@ -64,9 +64,9 @@ class TestDataHandler(unittest.TestCase):
 
     def test_no_df_set(self):
         dh = fm_dl.DataHandler()
-        self.assertRaises(AttributeError, dh.get_wins)
-        self.assertRaises(AttributeError, dh.get_teams)
-        self.assertRaises(AttributeError, dh.get_game_spreads)
+        self.assertRaises(TypeError, dh.get_wins)
+        self.assertRaises(TypeError, dh.get_teams)
+        self.assertRaises(TypeError, dh.get_game_spreads)
 
 
 if __name__ == '__main__':
