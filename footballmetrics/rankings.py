@@ -1,8 +1,6 @@
 from __future__ import division
 
-import os
 import multiprocessing as mp
-import sqlite3
 
 import numpy as np
 import pandas as pd
