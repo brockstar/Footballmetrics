@@ -121,7 +121,6 @@ class DataHandler(object):
             self._standings_df['MoV'] = mov
         return mov
 
-
     def get_scoring_over_avg(self, key='offense'):
         '''
         Returns the scoring of a team's offense/defense over average.
