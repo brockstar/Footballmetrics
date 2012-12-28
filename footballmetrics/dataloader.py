@@ -124,7 +124,9 @@ class DataHandler(object):
         -----
         Works with either standings_df or games_df.
         '''
-        if self._standings_df is None:
+        if self._standings_df is None and self._games_df is None:
+            raise AttributeError('games_df and standings_df not set.')
+        elif self._games_df is None:
             teams = sorted(self._standings_df.index)
         else:
             teams = sorted(set(self._games_df['HomeTeam']) | set(self._games_df['AwayTeam']))
