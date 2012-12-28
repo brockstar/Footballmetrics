@@ -13,27 +13,46 @@ import footballmetrics.dataloader as fm_dl
 
 
 class FISB_Ranking(object):
-    '''
-    This class calculates a ranking similar to Sagarin's. It uses all
-    games played in the season given by *year* and the given *week* 
-    to determine a rating for every team and an additional home field advantage.
-    There is also the possibility for a bootstrap of the results, so that
-    the weight of potential outliers can be reduced.  
-    '''
     def __init__(self, games_df):
+        '''
+        Implementation of Sagarin's rankings. It uses the point spread
+        in every single game played and calculates a ranking for every team
+        and a global homefield advantage.
+
+        Parameters
+        ----------
+        games_df : pandas DataFrame, footballmetrics.DataLoader
+                DataFrame or DataLoader object containing all games that shall
+                be included in computation. Needs to have following columns:
+                [HomeTeam, AwayTeam, HomeScore, AwayScore].
+
+        See also
+        --------
+        ML_Ranking, SRS
+        '''
         self._dh = fm_dl.DataHandler(games_df=games_df)
         self._teams = self._dh.get_teams()
         self._games = self._dh.get_games()
 
     def calculate_ranking(self, bootstrap_iterations=None, nprocs=2):
         '''
-        Calculates the ranking based on the data loaded in ``load_data``.
-        It uses a singular value decomposition (SVD) to decompose 
-        the game matrix. It returns the ratings for each team and the 
-        home field advantage.
-        If *bootstrap_iterations* is set to an integer number, the game matrix will be 
-        randomized as often as given in iteration. *nprocs* determines the number of 
-        CPU cores used for computation.
+        Calculates the rankings.
+
+        Parameters
+        ----------
+        bootstrap_iterations : None, int
+            If set to an integer value x, the game matrix will be randomized
+            x-times and be solved independently. The rankings are returned as
+            the means from the bootstrapping.
+            If set to None only the input game matrix will be solved.
+        nprocs : int
+            Number of cores used for calculating the ranking.
+            Only applied when bootstrapping is used.
+
+        Returns
+        -------
+        ratings : pandas Series
+            This pandas Series contains the ratings with the team names as index.
         '''
         home_margins = self._dh.get_game_spreads()
         game_matrix = self._get_game_matrix()
@@ -117,11 +136,27 @@ class FISB_Ranking(object):
 class ML_Ranking(object):
     def __init__(self, games_df, standings_df):
         '''
-        This class produces Maximum-Likelihood rankings solely based on wins and losses.
-        A dummy team is introduced, to assure finite ratings for unbeaten teams. It is easy to
-        calculate a win probability with this model, since the probability for a victory of team A
-        is: W(A) = R(A) / (R(A) + R(B)).
-        The ratings will be calculated for all games played in season *year* up to week *week*.
+        Implementation of a maximum-likelihood ranking system
+        solely based on wins and losses.
+        A dummy team is introduced, to assure finite ratings for unbeaten teams. 
+        It is easy to calculate a win probability with this model.
+        The probability for a victory of team A is:
+            W(A) = R(A) / (R(A) + R(B)).
+        
+        Parameters
+        ----------
+        games_df : pandas DataFrame, footballmetrics.DataLoader
+            DataFrame or DataLoader object containing all games that shall
+            be included in computation. Needs to have following columns:
+            [HomeTeam, AwayTeam].
+        standings_df : pandas DataFrame, footballmetrics.DataLoader
+            DataFrame or DataLoader object containing the standings for all
+            teams. Following columns need to be in it:
+            [Win, Loss, Tie]
+
+        See also
+        --------
+        FISB_Ranking, SRS
         '''
         self._dh = fm_dl.DataHandler(games_df=games_df, standings_df=standings_df)
         self._teams = self._dh.get_teams()
@@ -129,8 +164,23 @@ class ML_Ranking(object):
 
     def calculate_ranking(self, max_iter=100):
         '''
-        Calculates the ranking. *max_iter* defines the maximal number of iterations before aborting.
-        The other criterion for convergence is a sum-squared error of less than 1e-3.
+        Calculates the ranking. 
+        
+        Parameters
+        ----------
+        max_iter : int
+            Maximum number of iterations.
+
+        Returns
+        -------
+        ratings : pandas Series
+            This Series contains the ratings with the team names as index.
+
+        Notes
+        -----
+        Besides the maximum number of iterations there is the sum squared error
+        as additional convergence criterion. 
+        If SSE < 1e-3 the iteration will terminate, too.
         '''
         rating = {team: a for team, a in zip(self._teams, np.ones((len(self._teams))))}
         new_rating = rating.copy() 
@@ -155,10 +205,26 @@ class ML_Ranking(object):
 class SRS(object):
     def __init__(self, games_df, standings_df):
         '''
-        This class is capable of computing the Simple Rating System (SRS) for all teams
-        in a given league. The SRS is simply the margin of victory (MoV) corrected by an value
-        identified as strength of schedule (SOS). Hence, SRS = MoV + SOS.
-        The ratings will be calculated for all games played in season *year* up to week *week*.
+        Implementation of the Simple Ranking System (SRS).
+        It is based on the margins of victory (MoV) for every team. 
+        The rating can be interpreted as follows:
+        SRS = MoV + SOS
+        Here, SOS is the strength of schedule.
+
+        Parameters
+        ----------
+        games_df : pandas DataFrame, footballmetrics.DataLoader
+            DataFrame or DataLoader object containing all games that shall
+            be included in computation. Needs to have following columns:
+            [HomeTeam, AwayTeam].
+        standings_df : pandas DataFrame, footballmetrics.DataLoader
+            DataFrame or DataLoader object containing the standings for all
+            teams. Following columns need to be in it:
+            [Win, Loss, Tie]
+
+        See also
+        --------
+        FISB_Ranking, ML_Ranking 
         '''
         self._dh = fm_dl.DataHandler(games_df=games_df, standings_df=standings_df)
         self._teams = self._dh.get_teams()
@@ -166,11 +232,29 @@ class SRS(object):
 
     def calculate_ranking(self, method='normal', max_iter=100):
         '''
-        This method calculates the rankings.
-        The parameter *method* defines if the ordinary SRS or OSRS/DSRS is calculated.
-        method = {'normal', 'offense', 'defense'}
-        *max_iter* determines the maximal number of iterations before aborting. The other
-        criterion of convergence is a sum-squared error of less than 1e-3.
+        Calculates the rankings.
+        
+        Parameters
+        ----------
+        method : {'normal', 'offense', 'defense'}
+            Switches between normal SRS, offense SRS (OSRS) and defense SRS (DSRS).
+        max_iter: int
+            Maximum number of iterations.
+
+        Returns
+        -------
+        srs : dict
+            Contains the ratings for each team.
+        mov : dict
+            Contains the margin of victory (MoV) for each team.
+        sos : dict
+            Contains the strength of schedule (SOS) for each team.
+
+        Notes
+        -----
+        Besides the maximum number of iterations there is the sum squared error
+        as additional convergence criterion. 
+        If SSE < 1e-3 the iteration will terminate, too.
         '''
         ssq = 1.
         n_games = dict(self._dh.get_number_of_games())
@@ -199,4 +283,4 @@ class SRS(object):
             print('Warning: Maximum number of iterations reached. Current sum squared error is {%3.3e}'.format(ssq))
         sos = {team: srs[team] - mov[team] for team in srs}
         return srs, mov, sos
-            
+
