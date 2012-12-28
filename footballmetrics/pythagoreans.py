@@ -1,7 +1,7 @@
 from __future__ import division
 
 import numpy as np
-from scipy.optimize import leastsq
+import scipy.optimize as sc_opt
 
 import footballmetrics.dataloader as fm_dl
 
@@ -20,7 +20,9 @@ class PythagoreanExpectation(object):
         self._standings = standings_df
         self._dh = fm_dl.DataHandler(standings_df=standings_df)
         self._params = [2.63]
-        self._pyth = lambda pf, pa, x: pf ** x / (pf ** x + pa ** x)
+    
+    def _pyth(self, pf, pa, x): 
+        return pf ** x / (pf ** x + pa ** x)
    
     def set_exponent(self, val):
         '''If you don't want to optimize the exponent, you can set its value here.'''
@@ -36,18 +38,16 @@ class PythagoreanExpectation(object):
         pts_for = self._standings['PointsFor']
         pts_against = self._standings['PointsAgainst']
         if optimize:
-            pythagoreans = self._optimize(pts_for, pts_against)
-        else:
-            pythagoreans = self._pyth(pts_for, pts_against, self._params)
+            # Set optimized _params by calling _optimize()
+            self._optimize(pts_for, pts_against)
+        pythagoreans = self._pyth(pts_for, pts_against, self._params)
         return pythagoreans
 
     def _optimize(self, pf, pa):
         wlp = self._dh.get_wins() / self._dh.get_number_of_games()
         errfunc = lambda x, pf, pa: self._pyth(pf, pa, x) - wlp
-        xopt, success = leastsq(errfunc, x0=self._params, args=(pf, pa))
+        xopt, success = sc_opt.leastsq(errfunc, x0=self._params, args=(pf, pa))
         self._params = xopt
-        return self._pyth(pf, pa, self._params)
-
 
 
 class Pythagenpat(PythagoreanExpectation):
@@ -61,18 +61,10 @@ class Pythagenpat(PythagoreanExpectation):
         p = pf ** self._exp(pf, pa, x) / (pf ** self._exp(pf, pa, x) + pa ** self._exp(pf, pa, x))
         return p
 
-    def _optimize(self, pf, pa):
-        wlp = self._dh.get_wins() / self._dh.get_number_of_games()
-        errfunc = lambda x, pf, pa: self._pyth(pf, pa, self._exp(pf, pa, x)) - wlp
-        xopt, success = leastsq(errfunc, x0=self._params, args=(pf, pa))
-        print xopt, success
-        self._params = xopt
-        return self._pyth(pf, pa, self._exp(pf, pa, xopt))
-
 
 class Pythagenport(Pythagenpat):
     def __init__(self, standings_df):
         super(Pythagenport, self).__init__(standings_df)
-        self._params = [1.5, 0.45]
-        self._n_games = self._dh.get_number_of_games()
+        self._params = [1.45, 0.45]
         self._exp = lambda pf, pa, x: x[0] * np.log10((pf + pa) / self._n_games) + x[1]
+ 
