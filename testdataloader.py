@@ -19,23 +19,21 @@ class TestDataLoader(unittest.TestCase):
         df = fm_dl.from_sqlite('test.db', 'select * from games')
         for key in df:
             series = df[key] == self.games[key]
-            self.assert_(list(series.unique()) == [True])
+            self.assertTrue(series.unique())
 
-    def test_from_sqlite_wrong_arguments(self):
+    def test_from_csv(self):
+        df = fm_dl.from_csv('test_dataloader.csv')
+        for key in df:
+            series = df[key] == self.games[key]
+            self.assertTrue(list(series.unique()))
+
+    def test_wrong_arguments(self):
         self.assertRaises(IOError, 
                           fm_dl.from_sqlite, 
                           'nodb.db', 'select * from games')
         self.assertRaises(sqlite3.OperationalError, 
                           fm_dl.from_sqlite, 
                           'test.db', 'nonsense')
-
-    def test_from_csv(self):
-        df = fm_dl.from_csv('test_dataloader.csv')
-        for key in df:
-            series = df[key] == self.games[key]
-            self.assert_(list(series.unique()) == [True])
-
-    def test_from_csv_nofile(self):
         self.assertRaises(IOError, fm_dl.from_csv, 'nofile.csv')
 
 
@@ -59,12 +57,12 @@ class TestDataHandler(unittest.TestCase):
     def test_get_game_spreads(self):
         margins = self.games['HomeScore'] - self.games['AwayScore']
         series = self.dh.get_game_spreads() == margins
-        self.assert_(list(series.unique()) == [True])
+        self.assertTrue(list(series.unique()))
 
     def test_get_wins(self):
         wins = self.standings['Win']
         series = wins == self.dh.get_wins()
-        self.assertEqual(list(series.unique()), [True])
+        self.assertTrue(series.unique())
 
 
 if __name__ == '__main__':
