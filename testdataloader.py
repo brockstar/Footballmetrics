@@ -18,14 +18,12 @@ class TestDataLoader(unittest.TestCase):
     def test_from_sqlite(self):
         df = fm_dl.from_sqlite('test.db', 'select * from games')
         for key in df:
-            series = df[key] == self.games[key]
-            self.assertTrue(series.unique())
+            self.assertDictEqual(dict(df[key]), dict(self.games[key]))
 
     def test_from_csv(self):
         df = fm_dl.from_csv('test_dataloader.csv')
         for key in df:
-            series = df[key] == self.games[key]
-            self.assertTrue(list(series.unique()))
+            self.assertDictEqual(dict(df[key]), dict(self.games[key]))
 
     def test_wrong_arguments(self):
         self.assertRaises(IOError, 
@@ -56,13 +54,12 @@ class TestDataHandler(unittest.TestCase):
 
     def test_get_game_spreads(self):
         margins = self.games['HomeScore'] - self.games['AwayScore']
-        series = self.dh.get_game_spreads() == margins
-        self.assertTrue(list(series.unique()))
+        self.assertDictEqual(dict(self.dh.get_game_spreads()), dict(margins))
 
     def test_get_wins(self):
         wins = self.standings['Win']
         series = wins == self.dh.get_wins()
-        self.assertTrue(series.unique())
+        self.assertDictEqual(dict(self.dh.get_wins()), dict(wins))
 
 
 if __name__ == '__main__':
