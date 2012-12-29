@@ -1,146 +1,156 @@
 from __future__ import division
 
 import numpy as np
-import scipy.optimize
-import sqlite3
+import scipy.optimize as sc_opt
+
+import footballmetrics.dataloader as fm_dl
 
 
-class Pythagorean(object):
+def get_pythag(pts_for, pts_against, x=2.63):
     '''
-    This is a super class for the different types of the 
-    Pythagorean expectation. It is called with a dictionary containing 
-    the teams, scores and number of played games (i.e. given week).
-
-    * self.calculateExponent - Formula for the exponent x.
-    * self.guess - Initial guess for the optimization
+    Returns Pythagorean expectation (PE) for given values.
+    This is merely a convenience function for quick calculations.
     '''
-#    def __init__(self, dataDict):
-#        self.teams = dataDict['teams']
-#        self.pointsFor = np.double(dataDict['pointsFor'])
-#        self.pointsAgainst = np.double(dataDict['pointsAgainst'])
-#        self.wlp = np.double(dataDict['wlp'])
-#        self.nGames = np.int(dataDict['nGames'])
-	
-    def __init__(self, year, week, db_path, db_table='standings'):
-        self.prediction = {}
-        self.power = {}
-        self.__f = lambda pf, pa, x: pf**x / (pf**x + pa**x)
-        self.calculateExponent = lambda pf, pa, x: x
-        self.guess = 2.0
-        self.__year = year
-        self.__week = week
-        self.__teams = []
-        self.__pointsFor = []
-        self.__pointsAgainst = []
-        self.__wlp = []
-        self.nGames = 0
-        self.__load_data(db_path, db_table)
+    pyth = lambda pf, pa, x: pf ** x / (pf ** x + pa ** x)
+    return pyth(pts_for, pts_against, x)
 
-    def __load_data(self, db_path, db_table):
-        con = sqlite3.connect(db_path)
-        cur = con.cursor()
-        cmd = 'select Team, PointsFor, PointsAgainst, Win, Loss, Tie from %s where Year=%d and Week=%d' % (db_table, self.__year, self.__week)
-        cur.execute(cmd)
-        tmp = cur.fetchall()
-        con.close()
-        for row in tmp:
-            self.__teams.append(row[0])
-            self.__pointsFor.append(row[1])
-            self.__pointsAgainst.append(row[2])
-            nGames, wlp = self.__get_wlp(row[3:])
-            self.__wlp.append(wlp)
-            self.nGames = nGames
-        self.__pointsFor = np.double(self.__pointsFor)
-        self.__pointsAgainst = np.double(self.__pointsAgainst)
-        self.__wlp = np.double(self.__wlp)
-        self.nGames = np.int(self.nGames)
 
-    def getOptimalFitParams(self):
+class PythagoreanExpectation(object):
+    def __init__(self, standings_df):
         '''
-        Returns the optimal fit parameters retrieved from scipy.optimize.fmin 
-        in calculatePythagorean().
-        '''
-        return self.__xopt
+        This class is an implementation of the Pythagorean Expectation (PE).
+        The PE calculates a value that is commonly interpreted as the number of wins
+        a team should have based on points made and points suffered.
+        The formula for PE is simply:
+        Win_percentage = PF ** x / (PF ** x + PA ** x)
+        x = 2.63 by default.
 
-    def calculatePythagorean(self, optimize=True, staticParams=None):
+        Parameters
+        ----------
+        standings_df : pandas Data Frame, footballmetrics.DataLoader
+                DataFrame or DataLoader object containing the standings, 
+                for which the PE shall be calculated.
+                Needs to have columns [Win, Loss, Tie, PointsFor, PointsAgainst].
         '''
-        Returns the predictions and power for all given teams. 
-        An optimatization for the exponent formula is performed, 
-        if optimize is set to True. If set to False the static exponent 
-        parameters need to be given as a list.
+        self._standings = standings_df
+        self._dh = fm_dl.DataHandler(standings_df=standings_df)
+        self._params = [2.63]
+    
+    def _pyth(self, pf, pa, x): 
+        return pf ** x / (pf ** x + pa ** x)
+   
+    def set_exponent(self, val):
+        '''If you don't want to optimize the exponent, you can set its value here.'''
+        if not type(val) in [list, np.ndarray]:
+            self._params = np.array([val])
+        else:
+            self._params = np.array(val)
+
+    def get_exponent(self):
         '''
+        Returns the exponent x of PE. If an optimization was performed before calling
+        this function, the optimized exponent will be returned.
+        '''
+        return self._params
+
+    def calculate_pythagorean(self, optimize=True):
+        '''
+        Calculates the Pythagorean expectation. 
+        
+        Parameters
+        -----------
+        optimize : bool
+                If True an optimization will be performed, otherwise a preset value
+                will be used.
+
+        Returns
+        -------
+        pythagoreans : pandas Series
+                This will be a pandas Series containing the calculated 
+                Pythagorean expecations with team names as index.
+
+        See also
+        --------
+        PythagoreanExpectation.set_exponent
+        PythagoreanExpectation.get_exponent
+        '''
+        pts_for = self._standings['PointsFor']
+        pts_against = self._standings['PointsAgainst']
         if optimize:
-            #best fit parameters
-            self.__xopt = scipy.optimize.fmin(self.__minimizeParams, 
-                                            self.guess)
-        for i in range(len(self.__teams)):
-            if optimize:
-                #adjusted parameter per team
-                x = self.calculateExponent(self.__pointsFor[i], 
-                                           self.__pointsAgainst[i], 
-                                           self.__xopt) 
-            elif not optimize and staticParams != None:
-                x = self.calculateExponent(self.__pointsFor[i], 
-                                           self.__pointsAgainst[i], 
-                                           staticParams)
-            else:
-                raise ValueError('No fit exponents given.')
-            self.prediction[self.__teams[i]] = self.__f(self.__pointsFor[i], 
-                                                        self.__pointsAgainst[i], 
-                                                        x)
-            self.power[self.__teams[i]] = x
-        return self.prediction, self.power
-        
-    def __get_wlp(self, vals):
-        games_played = sum(vals)
-        wlp = vals[0] / games_played
-        return games_played, wlp
-        
-    def __minimizeParams(self, val):
-        ssq = 0.
-        for i in np.arange(0, len(self.__teams)):
-            x = self.calculateExponent(self.__pointsFor[i], 
-                                       self.__pointsAgainst[i], val)
-            calc = self.__f(self.__pointsFor[i], self.__pointsAgainst[i], x)
-            ssq += (self.__wlp[i] - calc)**2
-        return ssq
+            # Set optimized _params by calling _optimize()
+            self._optimize(pts_for, pts_against)
+        pythagoreans = self._pyth(pts_for, pts_against, self._params)
+        return pythagoreans
+
+    def _optimize(self, pf, pa):
+        wlp = self._dh.get_wins() / self._dh.get_number_of_games()
+        errfunc = lambda x, pf, pa: self._pyth(pf, pa, x) - wlp
+        xopt, success = sc_opt.leastsq(errfunc, x0=self._params, args=(pf, pa))
+        if 1 <= success <= 4:
+            self._params = xopt
+        else:
+            raise ValueError('Optimization did terminate successfully.')
 
 
-class PythagoreanExpectation(Pythagorean):
-    '''
-    Implementation of the classical Pythagorean expectation.
-    '''
-    def __init__(self, year, week, db_path, db_table='standings'):
-        super(PythagoreanExpectation, self).__init__(year, week, db_path, db_table='standings')
-        self.calculateExponent = lambda pf, pa, x: x[0]
-        self.guess = 2.0
+class Pythagenpat(PythagoreanExpectation):
+    def __init__(self, standings_df):
+        '''
+        This class is an implementation of Pythagenpat.
+        Pythagenpat uses the same formula as Pythagorean Expectation for 
+        calculating the expected win percentage, but contrary to PE it has no
+        static exponent.
+        The exponent is defined as follows:
+        x = ((PF + PA) / (# of games)) ** z
+        z = 0.287 by default.
 
-        
-class Pythagenport(Pythagorean):
-    '''
-    Implementation of Clay Davenport's Pythagenport formula.
-    '''
-    def __init__(self, year, week, db_path, db_table='standings'):
-        super(Pythagenport, self).__init__(year, week, db_path, db_table='standings')
-        self.calculateExponent = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.nGames)+x[1]
-        self.guess = [1.5, 0.45]
-        
+        Parameters
+        ----------
+        standings_df : pandas Data Frame, footballmetrics.DataLoader
+                DataFrame or DataLoader object containing the standings, 
+                for which the PE shall be calculated.
+                Needs to have columns [Win, Loss, Tie, PointsFor, PointsAgainst].
 
-class PythagenportFO(Pythagorean):
-    '''
-    Implementation of Football Outsiders' Pythagenport formula.
-    '''
-    def __init__(self, year, week, db_path, db_table='standings'):
-        super(PythagenportFO, self).__init__(year, week, db_path, db_table='standings')
-        self.calculateExponent = lambda pf, pa, x: x[0]*np.log10((pf+pa)/self.nGames)
-        self.guess = 1.5
-        
-        
-class Pythagenpat(Pythagorean):
-    '''
-    Implementation of David Smyth's Pythagenpat formula.
-    '''
-    def __init__(self, year, week, db_path, db_table='standings'):
-        super(Pythagenpat, self).__init__(year, week, db_path, db_table='standings')
-        self.calculateExponent = lambda pf, pa, x: ((pf+pa)/float(self.nGames))**x[0]
-        self.guess = 0.287
+        See also
+        --------
+        PythagoreanExpectation : super class of Pythagenpat
+        '''
+        super(Pythagenpat, self).__init__(standings_df)
+        self._params = [0.287]
+        self._n_games = self._dh.get_number_of_games()
+        self._exp = lambda pf, pa, x: ((pf + pa) / self._n_games) ** x
+
+    def _pyth(self, pf, pa, x):
+        exp = self._exp
+        p = pf ** exp(pf, pa, x) / (pf ** exp(pf, pa, x) + pa ** exp(pf, pa, x))
+        return p
+
+
+class Pythagenport(Pythagenpat):
+    def __init__(self, standings_df):
+        '''
+        This class is an implementation of Pythagenport.
+        Pythagenport uses the same formula as Pythagorean Expectation for 
+        calculating the expected win percentage, but similar to Pythagenpat
+        it has no static exponent.
+        The exponent is defined as follows:
+        x = z1 * log10((PF + PA) / (# of games)) + z2
+        By default:
+            z1 = 1.45
+            z2 = 0.45
+
+        Parameters
+        ----------
+        standings_df : pandas Data Frame, footballmetrics.DataLoader
+                       DataFrame or DataLoader object containing the standings, 
+                       for which the PE shall be calculated.
+                       Needs to have following columns: 
+                            [Win, Loss, Tie, PointsFor, PointsAgainst].
+
+        See also
+        --------
+        Pythagenpat, PythagoreanExpectation : super class of Pythagenpat
+        '''
+        super(Pythagenport, self).__init__(standings_df)
+        self._params = [1.45, 0.45]
+        self._exp = lambda pf, pa, x: x[0] * np.log10((pf + pa) / self._n_games) + x[1]
+ 
