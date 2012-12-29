@@ -9,8 +9,8 @@ import footballmetrics.rankings as fm_rkg
 class TestRankings(unittest.TestCase):
     def setUp(self):
         self.db_path = 'test.db'
-        self.games_df = fm_dl.DataLoader().load_sqlite('test.db', 'select * from games')
-        self.standings_df = fm_dl.DataLoader().load_sqlite('test.db', 'select * from standings')
+        self.games_df = fm_dl.from_sqlite('test.db', 'select * from games')
+        self.standings_df = fm_dl.from_sqlite('test.db', 'select * from standings')
 
     def test_fisb_rating(self):
         fisb = fm_rkg.FISB_Ranking(self.games_df)
