@@ -12,6 +12,9 @@ from scipy.linalg import svd, diagsvd
 import footballmetrics.dataloader as fm_dl
 
 
+# TODO: Add methods to calculate win probability directly
+
+
 class FISB_Ranking(object):
     def __init__(self, games_df):
         '''

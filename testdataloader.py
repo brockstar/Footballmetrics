@@ -58,7 +58,6 @@ class TestDataHandler(unittest.TestCase):
 
     def test_get_wins(self):
         wins = self.standings['Win']
-        series = wins == self.dh.get_wins()
         self.assertDictEqual(dict(self.dh.get_wins()), dict(wins))
 
 

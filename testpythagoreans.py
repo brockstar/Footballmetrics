@@ -10,8 +10,8 @@ import footballmetrics.pythagoreans as fm_pyth
 
 class TestPythagoreans(unittest.TestCase):
     def setUp(self):
-        self._df = fm_dl.DataLoader().load_sqlite('test.db', 'select * from standings')
-        self.Pythagorean = fm_pyth.PythagoreanExpectation(self._df)
+        self.df = fm_dl.from_sqlite('test.db', 'select * from standings')
+        self.Pythagorean = fm_pyth.PythagoreanExpectation(self.df)
 
     def test_pythagorean_exp_calculator(self):
         pyth = fm_pyth.get_pythag 
@@ -32,11 +32,9 @@ class TestPythagoreans(unittest.TestCase):
         self.Pythagorean.set_exponent(val)
         self.assertEqual(self.Pythagorean.get_exponent(), result)
         values = [3.0, 6.4]
-        result = np.array(values)
         self.Pythagorean.set_exponent(values)
-        exponent = self.Pythagorean.get_exponent()
-        for i in range(len(result)):
-            self.assertEqual(exponent[i], result[i])
+        exponent = list(self.Pythagorean.get_exponent())
+        self.assertListEqual(exponent, values)
 
 
 if __name__ == '__main__':

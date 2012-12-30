@@ -3,6 +3,8 @@ from __future__ import division
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+import patsy
+
 
 class OffenseEfficiency(object):
     def __init__(self, train_data_path=None):
@@ -12,15 +14,15 @@ class OffenseEfficiency(object):
         and lost fumble rate.
         Also a separation in pass and rush scores is possible.
         '''
-        self.__train(train_data_path)
+        self._train(train_data_path)
 
-    def __load_predictors(self, data):
+    def _load_predictors(self, data):
         predictors = sm.add_constant(np.column_stack((data['NY/A'],
                                                       data['Int'] / data['PassAtt'],
                                                       data['RushYds'] / data['RushAtt'],
             data['FL'] / (data['RushAtt'] + data['PassAtt']))))
         return predictors
-    def __train(self, train_data_path):
+    def _train(self, train_data_path):
         if train_data_path is not None:
             try:
                 data = pd.read_csv(train_data_path, index_col='Tm')
@@ -29,10 +31,10 @@ class OffenseEfficiency(object):
         else:
             data = pd.read_csv('../off_team_efficiency.csv', index_col='Tm')
         data['intercept'] = 1.0
-        X = self.__load_predictors(data)
+        X = self._load_predictors(data)
         Y = data['Pts'] / data['G']
         model = sm.OLS(Y, X)
-        self.__fit = model.fit()
+        self._fit = model.fit()
         print('Model successfully created.')
 
     def predict(self, data, pred_type='full', norm=False, ret='pd'):
@@ -44,10 +46,10 @@ class OffenseEfficiency(object):
         or NumPy array will be returned.
         '''
         data = pd.DataFrame(data)
-        Xpred = self.__load_predictors(data)
-        params = self.__fit.params
+        Xpred = self._load_predictors(data)
+        params = self._fit.params
         if pred_type == 'full':
-            Ypred = self.__fit.predict(Xpred)
+            Ypred = self._fit.predict(Xpred)
         elif pred_type == 'pass':
             pred_pass = lambda x: params[0] * x[:, 0] + params[1] * x[:, 1]
             Ypred = pred_pass(Xpred)
@@ -64,19 +66,20 @@ class OffenseEfficiency(object):
             return_data = data
         elif ret == 'np':
             return_data = Ypred
-        self.__data = data
+        self._data = data
         return return_data
 
     def get_model_summary(self):
-        print self.__fit.summary()
+        print self._fit.summary()
 
     def get_prediction_rsq(self):
-        PPG = self.__data['Pts'] / self.__data['G']
+        PPG = self._data['Pts'] / self._data['G']
         ss_tot = np.sum((PPG - PPG.mean()) ** 2)
-        ss_err = np.sum((PPG - self.__data['Prediction_Off']) ** 2)
+        ss_err = np.sum((PPG - self._data['Prediction_Off']) ** 2)
         r_sq = 1 - (ss_err / ss_tot)
         print 'R-squared: %3.3f' % r_sq
         return r_sq
+
 
 class DefenseEfficiency(object):
     def __init__(self, train_data_path=None):
@@ -84,14 +87,14 @@ class DefenseEfficiency(object):
         The DefenseEfficiency class creates a score based on
         net yards per pass attempt, interception rate and yards per rush attempt.
         '''
-        self.__train(train_data_path)
+        self._train(train_data_path)
 
-    def __load_predictors(self, data):
+    def _load_predictors(self, data):
         predictors = sm.add_constant(np.column_stack((data['NY/A'],
                                                       data['Int'] / data['PassAtt'],
                                                       data['RushYds'] / data['RushAtt'])))
         return predictors
-    def __train(self, train_data_path):
+    def _train(self, train_data_path):
         if train_data_path is not None:
             try:
                 data = pd.read_csv(train_data_path, index_col='Tm')
@@ -103,10 +106,10 @@ class DefenseEfficiency(object):
             except IOError, e:
                 print('IOError: %s' % e)
         data['intercept'] = 1.0
-        X = self.__load_predictors(data)
+        X = self._load_predictors(data)
         Y = data['Pts'] / data['G']
         model = sm.OLS(Y, X)
-        self.__fit = model.fit()
+        self._fit = model.fit()
         print('Model successfully created.')
 
     def predict(self, data, norm=False, ret='pd'):
@@ -117,8 +120,8 @@ class DefenseEfficiency(object):
         or NumPy array will be returned.
         '''
         data = pd.DataFrame(data)
-        Xpred = self.__load_predictors(data)
-        Ypred = self.__fit.predict(Xpred)
+        Xpred = self._load_predictors(data)
+        Ypred = self._fit.predict(Xpred)
         if norm:
             Ypred -= Ypred.mean()
         data['Prediction_Def'] = Ypred
