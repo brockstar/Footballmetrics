@@ -22,10 +22,10 @@ pat = fm_pyth.Pythagenpat(pythag_df)'''
 print('{0:15}{1:>12}'.format('Method', 'Time [ms]'))
 print('{0:15}{1:>12}'.format('-'*6, '-'*9))
 # FISB, no bootstrapping
-t1 = timeit.Timer('fisb.calculate_ranking()', tmp)
+t1 = timeit.Timer('fisb.calculate_ranking(nprocs=4)', tmp)
 print('{0:15}{1:>12.3f}'.format('FISB', t1.timeit(1000)))
 # FISB, with bootstrapping
-t2 = timeit.Timer('fisb.calculate_ranking(1000)', tmp)
+t2 = timeit.Timer('fisb.calculate_ranking(1000, nprocs=4)', tmp)
 print('{0:15}{1:>12.3f}'.format('FISB bootstrap', t2.timeit(10) * 100))
 # Max-L Ranking
 t3 = timeit.Timer('ml.calculate_ranking()', tmp)
