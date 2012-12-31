@@ -25,17 +25,31 @@ class FISB_Ranking(object):
         Parameters
         ----------
         games_df : pandas DataFrame, footballmetrics.DataLoader
-                DataFrame or DataLoader object containing all games that shall
-                be included in computation. Needs to have following columns:
-                [HomeTeam, AwayTeam, HomeScore, AwayScore].
+                DataFrame containing all games that shall be included in computation. 
+                Needs to have following columns: [HomeTeam, AwayTeam, HomeScore, AwayScore].
 
         See also
         --------
         ML_Ranking, SRS
         '''
+        self._initialize(games_df)
+
+    def _initialize(self, games_df):
         self._dh = fm_dl.DataHandler(games_df=games_df)
         self._teams = self._dh.get_teams()
         self._games = self._dh.get_games()
+
+    def set_games_df(self, games_df):
+        '''
+        Sets the games_df without reinitializing the object.
+
+        Parameters
+        ----------
+        games_df : pandas DataFrame, footballmetrics.DataLoader
+                DataFrame containing all games that shall be included in computation. 
+                Needs to have following columns: [HomeTeam, AwayTeam, HomeScore, AwayScore].
+        '''
+        self._initialize(games_df)
 
     def calculate_ranking(self, bootstrap_iterations=None, nprocs=2):
         '''
@@ -77,6 +91,29 @@ class FISB_Ranking(object):
         return ratings           
 
     def _bootstrap_games(self, game_matrix, home_margins, iterations, nprocs=2):
+        '''
+        Private method.
+
+        Handles the multiprocessing of bootstrapping.
+
+        Parameters
+        ----------
+        game_matrix : np.ndarray
+            Two-dimensional array containing games.
+        home_margins : np.ndarray, pandas Series
+            One-dimensional array (or Series) containing point spread of every
+            game.
+        iterations : int
+            Number of bootstrap iterations to be performed.
+        nprocs : int
+            Number of cores used for calculation.
+
+        Returns
+        -------
+        result : list
+            List with (# of iterations) elements. Each element is result of a
+            single decomposition.
+        '''
         def worker(N, out_q):
             result = []
             for i in range(N):
@@ -99,12 +136,43 @@ class FISB_Ranking(object):
         return results
 
     def _randomize_matrix(self, game_matrix, home_margins):
+        '''
+        Randomizes/Resamples game matrix.
+
+        Parameters
+        ----------
+        game_matrix : np.ndarray
+            Two-dimensional array containing games.
+        home_margins : np.ndarray, pandas Series
+            One-dimensional array (or Series) containing point spread of every
+            game.
+
+        Returns
+        -------
+        random_matrix : np.ndarray
+            Two-dimensional array with resampled game matrix
+        random_margins : np.ndarray, pandas Series
+            One-dimensional array (or Series) with resampled home margins.
+        '''
         rand_idx = randint(0, len(game_matrix), len(game_matrix))
         random_matrix = game_matrix[rand_idx]
         random_margins = home_margins[rand_idx]
         return random_matrix, random_margins
     
     def _get_game_matrix(self):
+        '''
+        Returns game matrix.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        matrix : np.ndarray
+            Two-dimensional array with matrix representation of games found in
+            data.
+        '''
         # rows = games
         # columns = teams + home field advantage
         matrix = np.zeros((len(self._games), len(self._teams)+1))
@@ -121,9 +189,24 @@ class FISB_Ranking(object):
         return matrix
 
     def _decompose_matrix(self, matrix, margins):
-        # decompose game game_matrix using SVD
+        '''
+        Decomposes game matrix.
+
+        Parameters
+        ----------
+        matrix : np.ndarray
+            Game matrix (2-dim).
+        margins : np.ndarray, pandas Series
+            Point spreads for every game (1-dim).
+
+        Returns
+        -------
+        x : np.ndarray
+            One-dimensional array containing rating for every team.
+        '''
+        # Decompose game game_matrix using SVD
         U, s, Vh = svd(matrix)
-        # extract singular values s and make diagonal game_matrix s_prime. 
+        # Extract singular values s and make diagonal game_matrix s_prime. 
         s = self._svd_filter(s)
         s_prime = diagsvd(s, shape(matrix)[1], shape(matrix)[0])
         # Ax = b --> x = A^(-1) * b = Vh_t * s_prime * U_t * b 
@@ -132,8 +215,21 @@ class FISB_Ranking(object):
         return x
 
     def _normalize(self, ratings):
-        ratings -= ratings.mean()
-        return ratings
+        '''
+        Normalizes ratings, so that mean is zero.
+
+        Parameters
+        ----------
+        ratings : np.ndarray, pandas Series
+            Ratings for every team (without home field advantage).
+
+        Returns
+        -------
+        norm_rating : np.ndarray, pandas Series
+            Normalized ratings.
+        '''
+        norm_ratings = ratings - ratings.mean()
+        return norm_ratings
 
 
 class ML_Ranking(object):

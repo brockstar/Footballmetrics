@@ -6,12 +6,35 @@ import scipy.optimize as sc_opt
 import footballmetrics.dataloader as fm_dl
 
 
-def get_pythag(pts_for, pts_against, x=2.63):
+def get_pythag(pts_for, pts_against, x=2.63, **kwargs):
     '''
-    Returns Pythagorean expectation (PE) for given values.
+    Returns Pythagorean expectation (PE).
     This is merely a convenience function for quick calculations.
+
+    Parameters
+    ----------
+    pts_for : int
+        Points made by team.
+    pts_against : int
+        Points suffered by team (= points made by team's opponents).
+    x : float
+        Exponent of PE.
+
+    kwargs
+    ------
+    func : callable
+        Custom function for calculation of PE.
+        Needs to accept 3 parameters: pts_for, pts_against, x
+
+    Returns
+    -------
+    pyth : float
+        Pythagorean expectation = predicted win percentage.
     '''
-    pyth = lambda pf, pa, x: pf ** x / (pf ** x + pa ** x)
+    if 'func' in kwargs:
+        pyth = kwargs['func']
+    else:
+        pyth = lambda pf, pa, x: pf ** x / (pf ** x + pa ** x)
     return pyth(pts_for, pts_against, x)
 
 
