@@ -25,8 +25,9 @@ class FISB_Ranking(object):
         Parameters
         ----------
         games_df : pandas DataFrame, footballmetrics.DataLoader
-                DataFrame containing all games that shall be included in computation. 
-                Needs to have following columns: [HomeTeam, AwayTeam, HomeScore, AwayScore].
+                DataFrame containing all games that shall be included
+                in computation. Needs to have following columns:
+                    [HomeTeam, AwayTeam, HomeScore, AwayScore].
 
         See also
         --------
@@ -46,8 +47,9 @@ class FISB_Ranking(object):
         Parameters
         ----------
         games_df : pandas DataFrame, footballmetrics.DataLoader
-                DataFrame containing all games that shall be included in computation. 
-                Needs to have following columns: [HomeTeam, AwayTeam, HomeScore, AwayScore].
+                DataFrame containing all games that shall be included
+                in computation. Needs to have following columns:
+                    [HomeTeam, AwayTeam, HomeScore, AwayScore].
         '''
         self._initialize(games_df)
 
@@ -69,26 +71,32 @@ class FISB_Ranking(object):
         Returns
         -------
         ratings : pandas Series
-            This pandas Series contains the ratings with the team names as index.
+            This pandas Series contains the ratings with the team names
+            as index.
         '''
         home_margins = self._dh.get_game_spreads()
         game_matrix = self._get_game_matrix()
-        # _svd_filter is a simple function to invert the sigma vector of the decomposition.
+        # _svd_filter is a simple function to invert the sigma vector
+        # of the decomposition.
         # It should be vectorized outside _decompose_matrix() for faster access.
         self._svd_filter = np.vectorize(lambda x: 0 if x < 1e-10 else 1 / x)
         if bootstrap_iterations is not None:
             try:
-                random_results = self._bootstrap_games(game_matrix, home_margins, 
-                        bootstrap_iterations, nprocs)
+                random_results = self._bootstrap_games(game_matrix,
+                                                       home_margins,
+                                                       bootstrap_iterations,
+                                                       nprocs)
                 x = np.mean(random_results, axis=0)
             except TypeError:
-                raise TypeError('bootstrap_iterations and nprocs need to be integer numbers.')
+                raise TypeError('bootstrap_iterations and nprocs need to be \
+                    integer numbers.')
         else:
             x = self._decompose_matrix(game_matrix, home_margins)
-        ratings = pd.Series({team: rating for team, rating in zip(self._teams, x)})
+        ratings = {team: rating for team, rating in zip(self._teams, x)}
+        ratings = pd.Series(ratings)
         ratings = self._normalize(ratings)
         ratings = ratings.append(pd.Series({'Home field advantage': x[-1]}))
-        return ratings           
+        return ratings
 
     def _bootstrap_games(self, game_matrix, home_margins, iterations, nprocs=2):
         '''
@@ -117,7 +125,8 @@ class FISB_Ranking(object):
         def worker(N, out_q):
             result = []
             for i in range(N):
-                matrix, margins = self._randomize_matrix(game_matrix, home_margins)
+                matrix, margins = self._randomize_matrix(game_matrix,
+                                                         home_margins)
                 res = self._decompose_matrix(matrix, margins)
                 result += [res]
             out_q.put(result)
@@ -158,7 +167,7 @@ class FISB_Ranking(object):
         random_matrix = game_matrix[rand_idx]
         random_margins = home_margins[rand_idx]
         return random_matrix, random_margins
-    
+
     def _get_game_matrix(self):
         '''
         Returns game matrix.
@@ -175,8 +184,9 @@ class FISB_Ranking(object):
         '''
         # rows = games
         # columns = teams + home field advantage
-        matrix = np.zeros((len(self._games), len(self._teams)+1))
-        # To faster access index of every team create dict with indices for every team
+        matrix = np.zeros((len(self._games), len(self._teams) + 1))
+        # To faster access index of every team create dict
+        # with indices for every team.
         idx = {k: i for i, k in enumerate(self._teams)}
         get_idx = lambda team: idx[team]
         index_home = self._games['HomeTeam'].apply(get_idx)
@@ -206,11 +216,12 @@ class FISB_Ranking(object):
         '''
         # Decompose game game_matrix using SVD
         U, s, Vh = svd(matrix)
-        # Extract singular values s and make diagonal game_matrix s_prime. 
+        # Extract singular values s and make diagonal game_matrix s_prime.
         s = self._svd_filter(s)
         s_prime = diagsvd(s, shape(matrix)[1], shape(matrix)[0])
-        # Ax = b --> x = A^(-1) * b = Vh_t * s_prime * U_t * b 
-        # It looks a bit strange with np.dot but it's significantly faster than mat(Vh) * ...
+        # Ax = b --> x = A^(-1) * b = Vh_t * s_prime * U_t * b
+        # It looks a bit strange with np.dot, but it's significantly
+        # faster than mat(Vh) * ...
         x = dot(dot(dot(Vh.T, s_prime), U.T), margins.T)
         return x
 
@@ -237,11 +248,11 @@ class ML_Ranking(object):
         '''
         Implementation of a maximum-likelihood ranking system
         solely based on wins and losses.
-        A dummy team is introduced, to assure finite ratings for unbeaten teams. 
+        A dummy team is introduced, to assure finite ratings for unbeaten teams.
         It is easy to calculate a win probability with this model.
         The probability for a victory of team A is:
             W(A) = R(A) / (R(A) + R(B)).
-        
+
         Parameters
         ----------
         games_df : pandas DataFrame, footballmetrics.DataLoader
@@ -257,14 +268,15 @@ class ML_Ranking(object):
         --------
         FISB_Ranking, SRS
         '''
-        self._dh = fm_dl.DataHandler(games_df=games_df, standings_df=standings_df)
+        self._dh = fm_dl.DataHandler(games_df=games_df,
+                                     standings_df=standings_df)
         self._teams = self._dh.get_teams()
         self._opponents = self._dh.get_opponents()
 
     def calculate_ranking(self, max_iter=100):
         '''
-        Calculates the ranking. 
-        
+        Calculates the ranking.
+
         Parameters
         ----------
         max_iter : int
@@ -278,18 +290,20 @@ class ML_Ranking(object):
         Notes
         -----
         Besides the maximum number of iterations there is the sum squared error
-        as additional convergence criterion. 
+        as additional convergence criterion.
         If SSE < 1e-3 the iteration will terminate, too.
         '''
-        rating = {team: a for team, a in zip(self._teams, np.ones((len(self._teams))))}
-        new_rating = rating.copy() 
+        rating = {team: a for team, a in zip(self._teams,
+            np.ones((len(self._teams))))}
+        new_rating = rating.copy()
         wins = self._dh.get_wins()
         dummy_rating = 1.0
         ssq = 1.0
         i = 0
         while ssq > 1e-3 and i < max_iter:
             for team in self._teams:
-                denom = sum(1.0 / (rating[team] + rating[opp]) for opp in self._opponents[team])
+                denom = sum(1.0 / (rating[team] + rating[opp]) for opp
+                    in self._opponents[team])
                 # dummy win and loss
                 denom += 2.0 / (rating[team] + dummy_rating)
                 new_rating[team] = (wins[team] + 1) / denom
@@ -297,7 +311,8 @@ class ML_Ranking(object):
             rating = new_rating.copy()
             i += 1
         if i == max_iter:
-            print('Warning: Maximum number of iterations reached. Current sum squared error is {%3.3e}'.format(ssq))
+            print('Warning: Maximum number of iterations reached. \
+                Current sum squared error is {%3.3e}'.format(ssq))
         return pd.Series(rating)
 
 
@@ -305,7 +320,7 @@ class SRS(object):
     def __init__(self, games_df, standings_df):
         '''
         Implementation of the Simple Ranking System (SRS).
-        It is based on the margins of victory (MoV) for every team. 
+        It is based on the margins of victory (MoV) for every team.
         The rating can be interpreted as follows:
         SRS = MoV + SOS
         Here, SOS is the strength of schedule.
@@ -323,20 +338,22 @@ class SRS(object):
 
         See also
         --------
-        FISB_Ranking, ML_Ranking 
+        FISB_Ranking, ML_Ranking
         '''
-        self._dh = fm_dl.DataHandler(games_df=games_df, standings_df=standings_df)
+        self._dh = fm_dl.DataHandler(games_df=games_df,
+                                     standings_df=standings_df)
         self._teams = self._dh.get_teams()
         self._opponents = self._dh.get_opponents()
 
     def calculate_ranking(self, method='normal', max_iter=100):
         '''
         Calculates the rankings.
-        
+
         Parameters
         ----------
         method : {'normal', 'offense', 'defense'}
-            Switches between normal SRS, offense SRS (OSRS) and defense SRS (DSRS).
+            Switches between normal SRS, offense SRS (OSRS) and
+            defense SRS (DSRS).
         max_iter: int
             Maximum number of iterations.
 
@@ -352,7 +369,7 @@ class SRS(object):
         Notes
         -----
         Besides the maximum number of iterations there is the sum squared error
-        as additional convergence criterion. 
+        as additional convergence criterion.
         If SSE < 1e-3 the iteration will terminate, too.
         '''
         ssq = 1.
@@ -372,14 +389,15 @@ class SRS(object):
             raise ValueError('Unknown method "{}".'.format(method))
         new_srs = {}
         i = 0
-        calc_rating = lambda team: mov[team] + sum(srs[opp] for opp in self._opponents[team]) / n_games[team]
+        calc_rating = lambda team: mov[team] + sum(srs[opp] for opp in
+            self._opponents[team]) / n_games[team]
         while ssq > 1e-3 and i <= max_iter:
             new_srs = {team: calc_rating(team) for team in self._teams}
             ssq = sum((new_srs[team] - srs[team]) ** 2 for team in srs)
             srs = new_srs.copy()
             i += 1
         if i == max_iter:
-            print('Warning: Maximum number of iterations reached. Current sum squared error is {%3.3e}'.format(ssq))
+            print('Warning: Maximum number of iterations reached. \
+                Current sum squared error is {%3.3e}'.format(ssq))
         sos = {team: srs[team] - mov[team] for team in srs}
         return srs, mov, sos
-

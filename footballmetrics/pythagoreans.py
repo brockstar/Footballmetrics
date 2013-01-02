@@ -42,8 +42,8 @@ class PythagoreanExpectation(object):
     def __init__(self, standings_df):
         '''
         This class is an implementation of the Pythagorean Expectation (PE).
-        The PE calculates a value that is commonly interpreted as the number of wins
-        a team should have based on points made and points suffered.
+        The PE calculates a value that is commonly interpreted as the number of
+        wins a team should have based on points made and points suffered.
         The formula for PE is simply:
         Win_percentage = PF ** x / (PF ** x + PA ** x)
         x = 2.63 by default.
@@ -51,19 +51,21 @@ class PythagoreanExpectation(object):
         Parameters
         ----------
         standings_df : pandas Data Frame, footballmetrics.DataLoader
-                DataFrame or DataLoader object containing the standings, 
-                for which the PE shall be calculated.
-                Needs to have columns [Win, Loss, Tie, PointsFor, PointsAgainst].
+                DataFrame or DataLoader object containing the standings, for
+                which the PE shall be calculated. Needs to have columns:
+                    [Win, Loss, Tie, PointsFor, PointsAgainst].
         '''
         self._standings = standings_df
         self._dh = fm_dl.DataHandler(standings_df=standings_df)
         self._params = [2.63]
-    
-    def _pyth(self, pf, pa, x): 
+
+    def _pyth(self, pf, pa, x):
         return pf ** x / (pf ** x + pa ** x)
-   
+
     def set_exponent(self, val):
-        '''If you don't want to optimize the exponent, you can set its value here.'''
+        '''
+        If you don't want to optimize the exponent, you can set its value here.
+        '''
         if not type(val) in [list, np.ndarray]:
             self._params = np.array([val])
         else:
@@ -71,25 +73,25 @@ class PythagoreanExpectation(object):
 
     def get_exponent(self):
         '''
-        Returns the exponent x of PE. If an optimization was performed before calling
-        this function, the optimized exponent will be returned.
+        Returns the exponent x of PE. If an optimization was performed
+        before calling this function, the optimized exponent will be returned.
         '''
         return self._params
 
     def calculate_pythagorean(self, optimize=True):
         '''
-        Calculates the Pythagorean expectation. 
-        
+        Calculates the Pythagorean expectation.
+
         Parameters
         -----------
         optimize : bool
-                If True an optimization will be performed, otherwise a preset value
-                will be used.
+                If True an optimization will be performed, otherwise a preset
+                value will be used.
 
         Returns
         -------
         pythagoreans : pandas Series
-                This will be a pandas Series containing the calculated 
+                This will be a pandas Series containing the calculated
                 Pythagorean expecations with team names as index.
 
         See also
@@ -119,7 +121,7 @@ class Pythagenpat(PythagoreanExpectation):
     def __init__(self, standings_df):
         '''
         This class is an implementation of Pythagenpat.
-        Pythagenpat uses the same formula as Pythagorean Expectation for 
+        Pythagenpat uses the same formula as Pythagorean Expectation for
         calculating the expected win percentage, but contrary to PE it has no
         static exponent.
         The exponent is defined as follows:
@@ -129,9 +131,10 @@ class Pythagenpat(PythagoreanExpectation):
         Parameters
         ----------
         standings_df : pandas Data Frame, footballmetrics.DataLoader
-                DataFrame or DataLoader object containing the standings, 
+                DataFrame or DataLoader object containing the standings,
                 for which the PE shall be calculated.
-                Needs to have columns [Win, Loss, Tie, PointsFor, PointsAgainst].
+                Needs to have columns:
+                    [Win, Loss, Tie, PointsFor, PointsAgainst].
 
         See also
         --------
@@ -152,7 +155,7 @@ class Pythagenport(Pythagenpat):
     def __init__(self, standings_df):
         '''
         This class is an implementation of Pythagenport.
-        Pythagenport uses the same formula as Pythagorean Expectation for 
+        Pythagenport uses the same formula as Pythagorean Expectation for
         calculating the expected win percentage, but similar to Pythagenpat
         it has no static exponent.
         The exponent is defined as follows:
@@ -164,9 +167,9 @@ class Pythagenport(Pythagenpat):
         Parameters
         ----------
         standings_df : pandas Data Frame, footballmetrics.DataLoader
-                       DataFrame or DataLoader object containing the standings, 
+                       DataFrame or DataLoader object containing the standings,
                        for which the PE shall be calculated.
-                       Needs to have following columns: 
+                       Needs to have following columns:
                             [Win, Loss, Tie, PointsFor, PointsAgainst].
 
         See also
@@ -175,5 +178,5 @@ class Pythagenport(Pythagenpat):
         '''
         super(Pythagenport, self).__init__(standings_df)
         self._params = [1.45, 0.45]
-        self._exp = lambda pf, pa, x: x[0] * np.log10((pf + pa) / self._n_games) + x[1]
- 
+        self._exp = lambda pf, pa, x: x[0] * np.log10((pf + pa) /
+            self._n_games) + x[1]

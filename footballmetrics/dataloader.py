@@ -10,7 +10,7 @@ import pandas.io.sql as pd_sql
 def from_sqlite(db_path, query, index=None):
     '''
     Loads data from a local SQLite database.
-    
+
     Parameters
     ----------
     db_path : string
@@ -33,10 +33,11 @@ def from_sqlite(db_path, query, index=None):
     con.close()
     return df
 
+
 def from_csv(filename, index=None):
     '''
     Loads data from a comma-separated values file (CSV).
-    
+
     Parameters
     ----------
     filename : string
@@ -78,9 +79,9 @@ class DataHandler(object):
         -----
         Depending on the tasks to be performed it may be sufficient, if
         games_df/standings_df only contains a subset of the expected keys.
-        For example PointsFor/PointsAgainst isn't needed for returning 
+        For example PointsFor/PointsAgainst isn't needed for returning
         the unique teams contained in the DataFrame.
-        
+
         Nevertheless, if all expected keys are set, all available methods
         can be used.
         '''
@@ -114,7 +115,7 @@ class DataHandler(object):
     def get_teams(self):
         '''
         Get all (unique) teams.
-        
+
         Returns
         -------
         teams : pandas Series
@@ -135,7 +136,7 @@ class DataHandler(object):
     def get_opponents(self):
         '''
         Get opponents of all teams in games_df.
-        
+
         Returns
         -------
         opponents : pandas Series
@@ -145,17 +146,19 @@ class DataHandler(object):
             raise AttributeError('games_df not set.')
         else:
             games = self.get_games()
+
             def get_opp(team):
                 opp = list(games[games['HomeTeam'] == team]['AwayTeam'])
                 opp += list(games[games['AwayTeam'] == team]['HomeTeam'])
                 return opp
-            opponents = pd.DataFrame({team: get_opp(team) for team in self.get_teams()})
-            return opponents       
+            opponents = {team: get_opp(team) for team in self.get_teams()}
+            opponents = pd.DataFrame(opponents)
+            return opponents
 
     def get_wins(self):
         '''
         Get number of wins for each team from standings_df.
-        
+
         Returns
         -------
         wins : pandas Series
@@ -170,7 +173,7 @@ class DataHandler(object):
     def get_number_of_games(self):
         '''
         Get number of games for each team in standings_df.
-        
+
         Returns
         -------
         n_games : pandas Series
@@ -185,7 +188,7 @@ class DataHandler(object):
     def get_games(self):
         '''
         Get all games.
-        
+
         Returns
         -------
         games : pandas DataFrame
@@ -248,7 +251,7 @@ class DataHandler(object):
         Get scoring of a team's offense/defense over average.
         For offense scoring over average is defined as:
             Sc_off = (PF / (# of games)) - Avg(PF / (# of games))
-        
+
         Parameters
         ----------
         key : {'offense', 'defense'}
@@ -256,7 +259,7 @@ class DataHandler(object):
             is calculated.
         add_to_df : bool
             If True scoring over average will be inserted into standings_df.
-        
+
         Returns
         -------
         score : pandas Series
