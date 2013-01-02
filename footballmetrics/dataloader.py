@@ -130,7 +130,7 @@ class DataHandler(object):
             teams = sorted(self._standings_df.index)
         else:
             teams = sorted(set(self._games_df['HomeTeam']) | set(self._games_df['AwayTeam']))
-        return teams
+        return pd.Series(teams)
 
     def get_opponents(self):
         '''
