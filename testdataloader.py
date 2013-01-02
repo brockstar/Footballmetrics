@@ -50,7 +50,7 @@ class TestDataHandler(unittest.TestCase):
         self.assertRaises(AttributeError, dh.get_game_spreads)
    
     def test_get_teams(self):
-        self.assertEqual(self.dh.get_teams(), ['A', 'B', 'C', 'D'])
+        self.assertEqual(list(self.dh.get_teams()), ['A', 'B', 'C', 'D'])
 
     def test_get_game_spreads(self):
         margins = self.games['HomeScore'] - self.games['AwayScore']
